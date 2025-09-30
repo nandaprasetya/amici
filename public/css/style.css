@@ -1,0 +1,14 @@
+@keyframes vidLoaderLanding {
+    0%{
+        scale: 2;
+        opacity: 0;
+    }
+    100%{
+        scale: 1;
+        opacity: 1;
+    }
+}
+
+.vid-loader-animation{
+    animation: vidLoaderLanding 0.5s ease-out;
+}

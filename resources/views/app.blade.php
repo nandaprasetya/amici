@@ -29,6 +29,7 @@
                 background-color: oklch(0.145 0 0);
             }
         </style>
+        <link rel="stylesheet" href="/css/style.css">
 
         <title inertia>{{ config('app.name', 'Laravel') }}</title>
 
