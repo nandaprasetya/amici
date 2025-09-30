@@ -11,9 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('categories', function (Blueprint $table) {
-            $table->uuid('category_id')->primary();
-            $table->string('category_name');
+        Schema::create('table_gallery', function (Blueprint $table) {
+            $table->uuid('table_gallery_id');
+            $table->string('img_menu');
+            $table->uuid('table_id');
+            $table->foreign('table_id')->references('table_id')->on('tables')->onDelete('cascade');
             $table->timestamps();
         });
     }
@@ -23,6 +25,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('categories');
+        Schema::dropIfExists('table_gallery');
     }
 };

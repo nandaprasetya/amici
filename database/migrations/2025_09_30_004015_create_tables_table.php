@@ -11,9 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('categories', function (Blueprint $table) {
-            $table->uuid('category_id')->primary();
-            $table->string('category_name');
+        Schema::create('tables', function (Blueprint $table) {
+            $table->uuid('table_id')->primary();
+            $table->string('table_number');
+            $table->integer('total_chair');
+            $table->double('minimun_spend');
+            $table->double('price');
+            $table->text('desc');
             $table->timestamps();
         });
     }
@@ -23,6 +27,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('categories');
+        Schema::dropIfExists('tables');
     }
 };

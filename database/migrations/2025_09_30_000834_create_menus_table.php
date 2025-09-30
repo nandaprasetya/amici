@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('menus', function (Blueprint $table) {
-            $table->uuid('menu_id');
+            $table->uuid('menu_id')->primary();
             $table->string('menu_name');
             $table->double('price');
             $table->text('desc');
@@ -20,13 +20,21 @@ return new class extends Migration
             $table->double('protein');
             $table->double('carbo');
             $table->double('fat');
-            $table->tinyint('is_vegan');
-            $table->tinyint('is_halal');
-            $table->tinyint('is_gluten_free');
+            $table->tinyInteger('is_vegan');
+            $table->tinyInteger('is_halal');
+            $table->tinyInteger('is_gluten_free');
             $table->uuid('category_id');
-            $table->foreign('category_id')->references('category_id')->on('categories')->onDelete('cascade');
-            $table->uuid('restaurant_id');
-            $table->foreign('restaurant_id')->references('restaurant_id')->on('restaurants')->onDelete('cascade');
+    $table->foreign('category_id')
+          ->references('category_id')
+          ->on('categories')
+          ->onDelete('cascade');
+
+    // foreign key ke restaurants
+    $table->uuid('restaurant_id');
+    $table->foreign('restaurant_id')
+          ->references('restaurant_id')
+          ->on('restaurants')
+          ->onDelete('cascade');
             $table->timestamps();
         });
     }
