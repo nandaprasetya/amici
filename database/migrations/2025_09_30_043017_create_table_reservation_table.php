@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('table_reservation', function (Blueprint $table) {
-            $table->uuid('id_reservation');
+            $table->uuid('reservation_id')->primary();
             $table->uuid('user_id');
             $table->foreign('user_id')->references('user_id')->on('users')->onDelete('cascade');
             $table->datetime('reservation_time');
