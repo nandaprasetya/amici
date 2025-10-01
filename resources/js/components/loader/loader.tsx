@@ -6,6 +6,11 @@ const Loader: React.FC = () => {
     const [hideLoader, setHideLoader] = useState(false);
 
     useEffect(() => {
+        gsap.to(".vid-loader-animation", {
+            opacity: 1,
+            scale:1,
+            duration: 2,
+        });
         gsap.to(".loader-animation", {
             opacity: 0,
             duration: 0.5,

@@ -1,14 +1,34 @@
-@keyframes vidLoaderLanding {
-    0%{
-        scale: 2;
-        opacity: 0;
-    }
-    100%{
-        scale: 1;
-        opacity: 1;
-    }
+.vid-loader-animation{
+    scale: 2;
+    opacity: 0;
 }
 
-.vid-loader-animation{
-    animation: vidLoaderLanding 0.5s ease-out;
+
+#cursor {
+  position: fixed;
+  z-index: 101;
+  pointer-events: none;
+  transform: translateX(-100%);
+  transform: translateY(-100%);
+}
+
+.inner-cursor {
+  border-radius: 50%;
+  background-color: rgba(241, 241, 241, 0.3);
+  backdrop-filter: blur(8px);
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: scale(0);
+  transition: 0.3s ease;
+}
+
+.inner-cursor img{
+    transform: translateX(8%);
+}
+
+.inner-cursor.active {
+  transform: scale(1);
 }
