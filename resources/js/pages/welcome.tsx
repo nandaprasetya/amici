@@ -4,6 +4,7 @@ import { Head, Link, usePage } from '@inertiajs/react';
 import Loader from "@/components/loader/loader";
 import Navbar from "@/components/nav/nav";
 import { gsap } from "gsap";
+import RecomedationMenu from '@/components/home/recomendation-menu';
 import Cursor from '@/components/custom/followingCursor';
 
 export default function Welcome() {
@@ -33,6 +34,7 @@ export default function Welcome() {
                 </div>
                 <video autoPlay muted loop src="/asset/vid-company.mp4" className='w-full h-screen object-cover'></video>
             </div>
+            <RecomedationMenu />
          </div>
         </>
     );
