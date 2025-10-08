@@ -6,6 +6,7 @@ import Navbar from "@/components/nav/nav";
 import { gsap } from "gsap";
 import RecomedationMenu from '@/components/home/recomendation-menu';
 import Cursor from '@/components/custom/followingCursor';
+import AboutHome from '@/components/home/about-home';
 
 export default function Welcome() {
     const { auth } = usePage<SharedData>().props;
@@ -34,6 +35,7 @@ export default function Welcome() {
                 </div>
                 <video autoPlay muted loop src="/asset/vid-company.mp4" className='w-full h-screen object-cover'></video>
             </div>
+            <AboutHome />
             <RecomedationMenu />
          </div>
         </>
