@@ -18,7 +18,7 @@ export default function Welcome() {
         <Cursor></Cursor>
         <Navbar></Navbar>
         <Loader></Loader>
-         <div className="page-content bg-[#f9f6f1] w-full h-full min-h-screen z-[1]">
+         <div className="page-content bg-[#f9f6f1] w-full h-full min-h-screen relative z-[1]">
             <div className='w-full h-screen relative flex home'>
                 <div className="absolute z-[3] flex w-fit h-fit px-[12px] py-[12px] rounded-[16px] bg-white right-[16px] bottom-[16px]">
                     <img src="/asset/img-pizza.jpg" alt="img pizza" className='w-[140px] rounded-[8px]' />
@@ -42,6 +42,9 @@ export default function Welcome() {
             <BannerHome />
             <AwardsHome />
          </div>
+         <footer className="w-full sticky py-[60px] px-[3%] bottom-0 left-0 bg-[url('/asset/img-pizza.jpg')]">
+            
+         </footer>
         </>
     );
 }
