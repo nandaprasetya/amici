@@ -8,6 +8,7 @@ import RecomedationMenu from '@/components/home/recomendation-menu';
 import Cursor from '@/components/custom/followingCursor';
 import AboutHome from '@/components/home/about-home';
 import BannerHome from '@/components/home/banner-home';
+import AwardsHome from '@/components/home/awards-home';
 
 export default function Welcome() {
     const { auth } = usePage<SharedData>().props;
@@ -39,6 +40,7 @@ export default function Welcome() {
             <AboutHome />
             <RecomedationMenu />
             <BannerHome />
+            <AwardsHome />
          </div>
         </>
     );
