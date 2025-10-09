@@ -7,6 +7,7 @@ import { gsap } from "gsap";
 import RecomedationMenu from '@/components/home/recomendation-menu';
 import Cursor from '@/components/custom/followingCursor';
 import AboutHome from '@/components/home/about-home';
+import BannerHome from '@/components/home/banner-home';
 
 export default function Welcome() {
     const { auth } = usePage<SharedData>().props;
@@ -37,6 +38,7 @@ export default function Welcome() {
             </div>
             <AboutHome />
             <RecomedationMenu />
+            <BannerHome />
          </div>
         </>
     );
