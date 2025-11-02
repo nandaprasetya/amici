@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
+use App\Http\Controllers\RestaurantController;
 
 Route::get('/', function () {
     return Inertia::render('welcome');
@@ -11,6 +12,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', function () {
         return Inertia::render('dashboard');
     })->name('dashboard');
+});
+
+Route::prefix('restaurants')->group(function () {
+    Route::get('/', [RestaurantController::class, 'index']);
+    Route::post('/', [RestaurantController::class, 'store']);
+    Route::get('/{id}', [RestaurantController::class, 'show']);
+    Route::put('/{id}', [RestaurantController::class, 'update']);
+    Route::delete('/{id}', [RestaurantController::class, 'destroy']);
 });
 
 require __DIR__.'/settings.php';

@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Str;
 
-class Restaurants extends Model
+class Restaurant extends Model
 {
     use HasFactory;
 
@@ -18,14 +18,10 @@ class Restaurants extends Model
 
     protected $fillable = [
         'restaurant_id',
-        'name',
-        'description',
-        'address',
-        'phone',
-        'email',
-        'opening_hours',
-        'closing_hours',
-        'rating',
+        'restaurant_name',
+        'open_time',
+        'close_time',
+        'desc',
     ];
 
     protected static function boot()

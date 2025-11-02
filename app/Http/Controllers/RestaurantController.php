@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Restaurant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Validator;
 
 class RestaurantController extends Controller
 {
@@ -17,32 +18,49 @@ class RestaurantController extends Controller
             'data' => $restaurants
         ], 200);
     }
-
-    public function store(Request $request)
-    {
-        $request->validate([
-            'restaurant_name' => 'required|string|max:255',
-            'address' => 'required|string',
-            'phone' => 'nullable|string|max:20',
-            'email' => 'nullable|email',
+        public function store(Request $request)
+{
+    try {
+        // ✅ Validasi input
+        $validator = Validator::make($request->all(), [
+            'restaurant_name' => 'required|string|max:100',
+            'open_time' => 'required|date_format:H:i',
+            'close_time' => 'required|date_format:H:i|after:open_time',
             'desc' => 'nullable|string',
         ]);
 
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Validasi gagal.',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        // ✅ Simpan data ke database
         $restaurant = Restaurant::create([
-            'restaurant_id' => Str::uuid(),
             'restaurant_name' => $request->restaurant_name,
-            'address' => $request->address,
-            'phone' => $request->phone,
-            'email' => $request->email,
+            'open_time' => $request->open_time,
+            'close_time' => $request->close_time,
             'desc' => $request->desc,
         ]);
 
         return response()->json([
-            'success' => true,
-            'message' => 'Restoran berhasil ditambahkan',
+            'status' => true,
+            'message' => 'Restaurant berhasil ditambahkan.',
             'data' => $restaurant
         ], 201);
+
+    } catch (\Exception $e) {
+        // ✅ Tangkap error jika terjadi masalah (misal SQL, dsb)
+        return response()->json([
+            'status' => false,
+            'message' => 'Terjadi kesalahan saat menambahkan restaurant.',
+            'error' => $e->getMessage()
+        ], 500);
     }
+}
+
 
     public function show($id)
     {
