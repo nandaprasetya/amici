@@ -18,10 +18,7 @@ class RestaurantController extends Controller
             'data' => $restaurants
         ], 200);
     }
-        public function store(Request $request)
-{
-    try {
-        // ✅ Validasi input
+    public function store(Request $request){
         $validator = Validator::make($request->all(), [
             'restaurant_name' => 'required|string|max:100',
             'open_time' => 'required|date_format:H:i',
@@ -37,7 +34,6 @@ class RestaurantController extends Controller
             ], 422);
         }
 
-        // ✅ Simpan data ke database
         $restaurant = Restaurant::create([
             'restaurant_name' => $request->restaurant_name,
             'open_time' => $request->open_time,
@@ -50,16 +46,7 @@ class RestaurantController extends Controller
             'message' => 'Restaurant berhasil ditambahkan.',
             'data' => $restaurant
         ], 201);
-
-    } catch (\Exception $e) {
-        // ✅ Tangkap error jika terjadi masalah (misal SQL, dsb)
-        return response()->json([
-            'status' => false,
-            'message' => 'Terjadi kesalahan saat menambahkan restaurant.',
-            'error' => $e->getMessage()
-        ], 500);
     }
-}
 
 
     public function show($id)
