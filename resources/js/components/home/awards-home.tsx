@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import gsap from "gsap";
 
+
 export default function AwardsHome(){
     useEffect(() => {
     const boxes = document.querySelectorAll(".box-award");
@@ -24,11 +25,12 @@ export default function AwardsHome(){
           .to(imgs[0], { opacity: 1, duration: 1, ease: "power2.inOut" });
       }
     });
+
   }, []);
     return(
-        <div className="w-full h-fit pt-[80px] px-[3%] flex flex-col items-center">
-            <h1 className="text-[40px]">Awarded for Passion and Perfection</h1>
-            <p className="text-center">Each recognition reflects our dedication to crafting <br /> unforgettable dining experiences.</p>
+        <div className="w-full h-fit pt-[80px] px-[3%] flex flex-col items-center" id="awards">
+            <h1 className="text-[40px] text-black">Awarded for Passion and Perfection</h1>
+            <p className="text-center text-black">Each recognition reflects our dedication to crafting <br /> unforgettable dining experiences.</p>
             <div className="area-awards w-full h-fit flex">
                 <div className="box-award w-[25%] relative">
                     <img src="/asset/awards-1.png" alt="logo" className="w-full h-full object-contain aspect-square absolute" />
