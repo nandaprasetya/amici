@@ -17,7 +17,7 @@ export default function Navbar() {
       className={`w-full h-fit py-[24px] px-[32px] fixed z-[100] top-0 left-0 flex items-center justify-between transition-all duration-500 ${
         scrolled ? "bg-white shadow-md" : "bg-transparent"
       }`}
-    >
+    > 
       <img
         src={`${
         scrolled ? "/asset/amici-logo.png" : "/asset/amici-logo-white.png"
