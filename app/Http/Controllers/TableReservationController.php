@@ -129,7 +129,7 @@ class TableReservationController extends Controller
         $now = Carbon::now();
         $targetTime = $now->copy()->addDay();
 
-        $reservations = Reservation::where('is_reminder', false)
+        $reservations = TableReservation::where('is_reminder', false)
             ->whereIn('status', ['pending', 'confirmed'])
             ->whereDate('reservation_time', $targetTime->toDateString())
             ->get();

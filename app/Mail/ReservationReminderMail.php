@@ -2,7 +2,7 @@
 
 namespace App\Mail;
 
-use App\Models\Reservation;
+use App\Models\TableReservation;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
@@ -14,12 +14,12 @@ class ReservationReminderMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    public $reservation;
+    public TableReservation  $reservation;
 
     /**
      * Create a new message instance.
      */
-    public function __construct(Reservation $reservation)
+    public function __construct(TableReservation $reservation)
     {
         $this->reservation = $reservation;
     }
