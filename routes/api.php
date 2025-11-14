@@ -18,6 +18,7 @@ Route::put('/categories/{id}', [CategoryController::class, 'update']);
 Route::delete('/categories/{id}', [CategoryController::class, 'destroy']);
 
 Route::get('/menus', [MenuController::class, 'index']);
+Route::get('/recomendation', [MenuController::class, 'recommend']);
 Route::post('/menus', [MenuController::class, 'store']);
 Route::get('/menus/{id}', [MenuController::class, 'show']);
 Route::put('/menus/{id}', [MenuController::class, 'update']);

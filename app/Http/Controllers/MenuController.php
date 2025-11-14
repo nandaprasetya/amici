@@ -6,6 +6,7 @@ use App\Models\Menu;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Http;
 
 class MenuController extends Controller
 {
@@ -145,5 +146,61 @@ class MenuController extends Controller
             'status' => true,
             'message' => 'Menu berhasil dihapus.'
         ], 200);
+    }
+
+    public function recommend(Request $request)
+    {
+        $city = $request->input('city', 'Denpasar');
+        $apiKey = env('5367c9d2ebd24f151473a72dee5bd774');
+
+        $weatherResponse = Http::get("https://api.openweathermap.org/data/2.5/weather", [
+            'q' => $city,
+            'appid' => $apiKey,
+            'units' => 'metric',
+        ]);
+
+        if ($weatherResponse->failed()) {
+            return response()->json(['error' => 'Gagal mengambil data cuaca'], 500);
+        }
+
+        return response()->json([
+            'success' => true,
+            'prompt' => $weatherResponse,
+        ]);
+
+        $weatherData = $weatherResponse->json();
+        $weather = $weatherData['weather'][0]['main'] ?? 'Unknown';
+        $temp = $weatherData['main']['temp'] ?? 0;
+
+        $hour = now()->format('H');
+        if ($hour >= 5 && $hour < 11) {
+            $dayTime = 'pagi';
+        } elseif ($hour >= 11 && $hour < 15) {
+            $dayTime = 'siang';
+        } elseif ($hour >= 15 && $hour < 18) {
+            $dayTime = 'sore';
+        } else {
+            $dayTime = 'malam';
+        }
+
+        $menus = Menu::select('menu_name', 'desc', 'price')->get();
+
+        $menuList = $menus->map(fn($m) => "- {$m->menu_name} ({$m->price}): {$m->desc}")
+                        ->implode("\n");
+
+        $prompt = "
+        Cuaca saat ini: $weather ($temp°C)
+        Waktu: $dayTime
+        Daftar menu tersedia:
+        $menuList
+
+        Dari daftar menu di atas, rekomendasikan 3 makanan yang paling cocok dengan kondisi cuaca dan waktu ini.
+        Jelaskan alasan singkat untuk masing-masing pilihan.
+        ";
+
+        return response()->json([
+            'success' => true,
+            'prompt' => $prompt,
+        ]);
     }
 }
