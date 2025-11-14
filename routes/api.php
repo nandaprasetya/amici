@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\RestaurantController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\MenuController;
+use App\Http\Controllers\TableController;
 
 Route::get('/restaurants', [RestaurantController::class, 'index']);
 Route::post('/restaurants', [RestaurantController::class, 'store']);
@@ -23,3 +24,9 @@ Route::post('/menus', [MenuController::class, 'store']);
 Route::get('/menus/{id}', [MenuController::class, 'show']);
 Route::put('/menus/{id}', [MenuController::class, 'update']);
 Route::delete('/menus/{id}', [MenuController::class, 'destroy']);
+
+Route::get('/tables', [TableController::class, 'index']);
+Route::post('/tables', [TableController::class, 'store']);
+Route::get('/tables/{id}', [TableController::class, 'show']);
+Route::put('/tables/{id}', [TableController::class, 'update']);
+Route::delete('/tables/{id}', [TableController::class, 'destroy']);
