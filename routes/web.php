@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\RestaurantController;
+use App\Http\Controllers\AppController;
 use App\Http\Controllers\TableReservationController;
 
 Route::get('/', function () {
@@ -21,6 +22,7 @@ Route::prefix('restaurants')->group(function () {
     Route::get('/{id}', [RestaurantController::class, 'show']);
     Route::put('/{id}', [RestaurantController::class, 'update']);
     Route::delete('/{id}', [RestaurantController::class, 'destroy']);
+    Route::get('/', [AppController::class, 'index'])->middleware('auth');
 });
 
 Route::get('/send-reminders', [TableReservationController::class, 'sendReminders']);
