@@ -42,7 +42,7 @@ export default function Navbar() {
 
       <div className="nav-right-link flex items-center">
         <a
-          href="#"
+          href="/register"
           className={`transition-all duration-500 ${
             scrolled ? "text-[#000]" : "text-[#FFF]"
           }`}
