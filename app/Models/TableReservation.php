@@ -21,6 +21,12 @@ class TableReservation extends Model
         'reservation_time',
         'status',
         'bill',
+        'is_reminder'
+    ];
+
+    protected $casts = [
+        'reservation_time' => 'datetime',
+        'is_reminder' => 'boolean'
     ];
 
     protected static function boot()
