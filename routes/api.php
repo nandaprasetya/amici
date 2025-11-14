@@ -5,6 +5,7 @@ use App\Http\Controllers\RestaurantController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\MenuController;
 use App\Http\Controllers\TableController;
+use App\Http\Controllers\TableReservationController;
 
 Route::get('/restaurants', [RestaurantController::class, 'index']);
 Route::post('/restaurants', [RestaurantController::class, 'store']);
@@ -30,3 +31,9 @@ Route::post('/tables', [TableController::class, 'store']);
 Route::get('/tables/{id}', [TableController::class, 'show']);
 Route::put('/tables/{id}', [TableController::class, 'update']);
 Route::delete('/tables/{id}', [TableController::class, 'destroy']);
+
+Route::get('/reservation', [TableReservationController::class, 'index']);
+Route::post('/reservation', [TableReservationController::class, 'store']);
+Route::get('/reservation/{id}', [TableReservationController::class, 'show']);
+Route::put('/reservation/{id}', [TableReservationController::class, 'update']);
+Route::delete('/reservation/{id}', [TableReservationController::class, 'destroy']);
