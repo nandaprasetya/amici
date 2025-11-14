@@ -6,6 +6,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use App\Models\TableReservation;
 use Illuminate\Support\Str;
+use App\Mail\ReservationReminderMail;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Mail;
 
 
 class TableReservationController extends Controller
@@ -118,6 +121,31 @@ class TableReservationController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Reservation deleted successfully'
+        ]);
+    }
+
+    public function sendReminders()
+    {
+        $now = Carbon::now();
+        $targetTime = $now->copy()->addDay();
+
+        $reservations = Reservation::where('is_reminder', false)
+            ->whereIn('status', ['pending', 'confirmed'])
+            ->whereDate('reservation_time', $targetTime->toDateString())
+            ->get();
+
+        foreach ($reservations as $reservation) {
+            Mail::to($reservation->user->email)
+                ->send(new ReservationReminderMail($reservation));
+
+            $reservation->update([
+                'is_reminder' => true
+            ]);
+        }
+
+        return response()->json([
+            'message' => 'Reminder checked & sent',
+            'total_sent' => count($reservations)
         ]);
     }
 }
