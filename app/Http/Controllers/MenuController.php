@@ -151,7 +151,7 @@ class MenuController extends Controller
     public function recommend(Request $request)
     {
         $city = $request->input('city', 'Denpasar');
-        $apiKey = env('5367c9d2ebd24f151473a72dee5bd774');
+        $apiKey = env('OPENWEATHER_KEY');
 
         $weatherResponse = Http::get("https://api.openweathermap.org/data/2.5/weather", [
             'q' => $city,
@@ -162,11 +162,6 @@ class MenuController extends Controller
         if ($weatherResponse->failed()) {
             return response()->json(['error' => 'Gagal mengambil data cuaca'], 500);
         }
-
-        return response()->json([
-            'success' => true,
-            'prompt' => $weatherResponse,
-        ]);
 
         $weatherData = $weatherResponse->json();
         $weather = $weatherData['weather'][0]['main'] ?? 'Unknown';
