@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Models\Role;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Hash;
@@ -24,8 +25,7 @@ class UserController extends Controller
             'name'          => 'required|string|max:255',
             'email'         => 'required|email|unique:users,email',
             'phone_number'  => 'required|string|unique:users,phone_number',
-            'password'      => 'required|string|min:6',
-            'role_id'       => 'required|exists:roles,role_id',
+            'password'      => 'required|string|min:5',
         ]);
 
         if ($validator->fails()) {
@@ -36,13 +36,15 @@ class UserController extends Controller
             ], 422);
         }
 
+        $role = Role::where('role_name', "user")->first();
+
         $user = User::create([
             'user_id'       => Str::uuid()->toString(),
             'name'          => $request->name,
             'email'         => $request->email,
             'phone_number'  => $request->phone_number,
             'password'      => Hash::make($request->password),
-            'role_id'       => $request->role_id,
+            'role_id'       => $role->role_id,
         ]);
 
         return response()->json([
