@@ -3,24 +3,66 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
+use Inertia\Inertia;
 use App\Models\TableReservation;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use App\Mail\ReservationReminderMail;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Mail;
 
-
 class TableReservationController extends Controller
 {
     public function index()
     {
-        $reservations = TableReservation::all();
+        $reservations = TableReservation::with('user')
+            ->orderBy('reservation_time', 'desc')
+            ->get();
 
-        return response()->json([
-            'success' => true,
-            'data' => $reservations
+        return Inertia::render('Admin/ReservationManagement', [
+            'reservations' => $reservations
         ]);
+    }
+
+    public function userIndex(Request $request)
+    {
+        $userId = $request->user()->user_id;
+
+        $reservations = TableReservation::where('user_id', $userId)
+            ->orderBy('reservation_time', 'desc')
+            ->get();
+
+        return Inertia::render('Customer/ReservationInfo', [
+            'reservations' => $reservations
+        ]);
+    }
+
+    public function create()
+    {
+        return Inertia::render('Customer/Reservation');
+    }
+
+    public function storePublic(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'reservation_time' => 'required|date|after:now',
+            'pax' => 'required|integer|min:1', 
+        ]);
+
+        if ($validator->fails()) {
+            return redirect()->back()->withErrors($validator)->withInput();
+        }
+
+        TableReservation::create([
+            'reservation_id'   => (string) Str::uuid(),
+            'user_id'          => $request->user()->user_id, 
+            'reservation_time' => $request->reservation_time,
+            'status'           => 'pending', 
+            'bill'             => 0,         
+            'is_reminder'      => false
+        ]);
+
+        return redirect()->route('user.reservations.index');
     }
 
     public function store(Request $request)
@@ -46,6 +88,10 @@ class TableReservationController extends Controller
             'status'           => $request->status ?? 'pending',
             'bill'             => $request->bill
         ]);
+
+        if ($request->header('X-Inertia')) {
+            return redirect()->back();
+        }
 
         return response()->json([
             'success' => true,
@@ -135,12 +181,14 @@ class TableReservationController extends Controller
             ->get();
 
         foreach ($reservations as $reservation) {
-            Mail::to($reservation->user->email)
-                ->send(new ReservationReminderMail($reservation));
+            if ($reservation->user) {
+                Mail::to($reservation->user->email)
+                    ->send(new ReservationReminderMail($reservation));
 
-            $reservation->update([
-                'is_reminder' => true
-            ]);
+                $reservation->update([
+                    'is_reminder' => true
+                ]);
+            }
         }
 
         return response()->json([

@@ -30,7 +30,7 @@ export default function Welcome() {
                     <img src="/asset/img-pizza.jpg" alt="img pizza" className='w-[140px] rounded-[8px]' />
                     <div className="text-home flex flex-col justify-between mx-[20px] text-black">
                         <h1 className='font-medium text-[20px]'>Book a table and enjoy <br /> your food right now.</h1>
-                        <a href="" className='px-[16px] py-[6px] group h-[38px] overflow-hidden border border-black rounded-[24px] duration-[0.5s] w-fit hover:bg-black'>
+                        <a href="/reservation" className='px-[16px] py-[6px] group h-[38px] overflow-hidden border border-black rounded-[24px] duration-[0.5s] w-fit hover:bg-black'>
                             <div className="inner-link w-fit h-fit group-hover:-translate-y-[50%] duration-[0.5s] ease-out text-black">
                                 <p className='m-0 font-medium text-[16px]'>Make Reservation</p>
                                 <p className='m-0 font-medium text-[16px] text-white'>Make Reservation</p>

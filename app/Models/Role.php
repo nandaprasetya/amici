@@ -14,7 +14,7 @@ class Role extends Model
     protected $primaryKey = 'role_id';
     public $incrementing = false;
     protected $keyType = 'string';
-    protected $fillable = ['role_name'];
+    protected $fillable = ['role_id','role_name'];
 
     public function users()
     {

@@ -50,14 +50,14 @@ export default function Navbar() {
           SIGN IN
         </a>
         <a
-          href="#"
+          href="/login"
           className={`px-[16px] py-[10px] border-2 ml-[16px] transition-all duration-500 ${
             scrolled
               ? "border-[#000] text-[#000]"
               : "border-[#f9f6f1] text-[#FFF]"
           }`}
         >
-          Reservation
+          LOGIN
         </a>
       </div>
     </nav>
