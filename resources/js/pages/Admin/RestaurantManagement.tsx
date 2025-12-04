@@ -3,7 +3,6 @@ import { Head, Link } from '@inertiajs/react';
 import { Plus, Store, Clock, Pencil, Trash2, Search } from 'lucide-react';
 import { useState } from 'react';
 
-// --- Definisi Tipe Data ---
 interface Restaurant {
     restaurant_id: string;
     restaurant_name: string;
@@ -16,7 +15,6 @@ interface PageProps {
     restaurants: Restaurant[];
 }
 
-// --- Konfigurasi Breadcrumbs ---
 const breadcrumbs = [
     {
         title: 'Dashboard',
@@ -29,13 +27,10 @@ const breadcrumbs = [
 ];
 
 export default function RestaurantManagement({ restaurants }: PageProps) {
-    // 1. State untuk pencarian
     const [searchTerm, setSearchTerm] = useState('');
 
-    // 2. Logika Filter (Client-side Search)
     const filteredRestaurants = restaurants.filter((resto) => {
         const term = searchTerm.toLowerCase();
-        // Mencari berdasarkan Nama Restoran ATAU Deskripsi
         return (
             resto.restaurant_name?.toLowerCase().includes(term) ||
             (resto.desc && resto.desc.toLowerCase().includes(term))
@@ -49,7 +44,6 @@ export default function RestaurantManagement({ restaurants }: PageProps) {
             <div className="py-12">
                 <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
 
-                    {/* Header Halaman */}
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
                         <div>
                             <h2 className="text-xl font-bold text-gray-900">Daftar Restoran / Tenant</h2>
@@ -57,7 +51,6 @@ export default function RestaurantManagement({ restaurants }: PageProps) {
                         </div>
 
                         <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-                            {/* --- 3. Input Pencarian --- */}
                             <div className="relative w-full sm:w-64">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                     <Search className="h-4 w-4 text-gray-400" />
@@ -71,9 +64,8 @@ export default function RestaurantManagement({ restaurants }: PageProps) {
                                 />
                             </div>
 
-                            {/* Tombol Tambah */}
                             <Link
-                                href="/admin/restaurant-management/create"
+                                href="/admin/restaurants/create"
                                 className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 inline-flex items-center justify-center gap-2 shadow-sm transition-colors h-10 whitespace-nowrap"
                             >
                                 <Plus className="w-4 h-4" />
