@@ -12,25 +12,36 @@ Route::get('/', function () {
     return Inertia::render('welcome');
 })->name('home');
 
+// Public routes
 Route::get('/restaurants', [AppController::class, 'index'])->name('restaurants.index.user');
+Route::get('/reservation', [TableReservationController::class, 'reservationPage'])->name('reservation.page');
 
+// Authenticated user routes
 Route::middleware(['auth', 'verified'])->group(function () {
-    
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
-
-    Route::get('/restaurants', [AppController::class, 'index'])->name('restaurants.index.user'); 
     
     Route::get('/my-reservations', [TableReservationController::class, 'userIndex'])
         ->name('user.reservations.index'); 
 
+    // Table Reservation routes
+    Route::post('/reservation', [TableReservationController::class, 'store'])->name('reservation.store');
+    Route::get('/reservation/{id}', [TableReservationController::class, 'show'])->name('reservation.show');
+    Route::put('/reservation/{id}', [TableReservationController::class, 'update'])->name('reservation.update');
+    Route::delete('/reservation/{id}', [TableReservationController::class, 'destroy'])->name('reservation.destroy');
+    
+
+    Route::get('/menu-reservation', [FoodReservationController::class, 'index'])
+        ->name('food.reservation.page');
+    
+    Route::post('/food-reservation', [FoodReservationController::class, 'store'])
+        ->name('food.reservation.store');
 });
 
-// admin
+// Admin routes
 Route::middleware(['auth', 'verified', 'role:Admin,SuperAdmin'])
     ->prefix('admin')
     ->name('admin.') 
     ->group(function () {
-
 
     Route::prefix('restaurants')->group(function () {
         Route::get('/', [RestaurantController::class, 'index'])->name('restaurants.index');
@@ -42,9 +53,7 @@ Route::middleware(['auth', 'verified', 'role:Admin,SuperAdmin'])
     });
 
     Route::prefix('reservation')->group(function () {
-
         Route::get('/', [TableReservationController::class, 'index'])->name('reservation.index');
-        
         Route::post('/', [TableReservationController::class, 'store'])->name('reservation.store');
         Route::get('/{id}', [TableReservationController::class, 'show'])->name('reservation.show');
         Route::put('/{id}', [TableReservationController::class, 'update'])->name('reservation.update');
@@ -52,14 +61,10 @@ Route::middleware(['auth', 'verified', 'role:Admin,SuperAdmin'])
     });
 
     Route::get('/send-reminders', [TableReservationController::class, 'sendReminders'])->name('send-reminders');
-
 });
-Route::get('/reservation', [TableReservationController::class, 'reservationPage'])->name('reservation.page');
-Route::post('/reservation/store', [TableReservationController::class, 'store'])->name('reservation.store');
 
-Route::get('/reservation/food', [FoodReservationController::class, 'index'])
-    ->name('food.reservation.page');
-
+Route::post('/midtrans/callback', [FoodReservationController::class, 'midtransCallback'])
+    ->name('midtrans.callback');
 
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';

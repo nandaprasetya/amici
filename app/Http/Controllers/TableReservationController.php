@@ -6,7 +6,6 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\TableReservation;
 use Illuminate\Support\Facades\Validator;
-use App\Models\TableReservation;
 use App\Models\Restaurant;
 use App\Models\Table;
 use App\Models\User;
@@ -14,10 +13,10 @@ use Illuminate\Support\Str;
 use App\Mail\ReservationReminderMail;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Mail;
-use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
 use App\Models\DetailTableReservation;
-
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class TableReservationController extends Controller
 {
@@ -32,14 +31,16 @@ class TableReservationController extends Controller
             'data' => $reservations
         ]);
     }
-    
-    public function foodReservation()
-    {
-        Inertia::render("FoodReservation");
-    }
 
     public function store(Request $request)
 {
+    // Log untuk debugging
+    Log::info('Reservation Request:', $request->all());
+
+    if (!Auth::check()) {
+        return back()->withErrors(['auth' => 'User not authenticated']);
+    }
+
     $validator = Validator::make($request->all(), [
         'restaurant_id'     => 'required|exists:restaurants,restaurant_id',
         'name'              => 'required|string|max:255',
@@ -52,39 +53,39 @@ class TableReservationController extends Controller
     ]);
 
     if ($validator->fails()) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Validation failed',
-            'errors'  => $validator->errors()
-        ], 422);
+        return back()->withErrors($validator->errors());
     }
 
     try {
         DB::beginTransaction();
 
-        $dateTime = Carbon::parse($request->date . ' ' . $request->time);
+        // Parse waktu dari format "05:05 PM" ke format 24 jam
+        $timeString = $request->time;
+        $parsedTime = Carbon::createFromFormat('h:i A', $timeString);
+        
+        // Gabungkan tanggal dan waktu
+        $dateTime = Carbon::parse($request->date)->setTimeFrom($parsedTime);
 
-        /** HITUNG TOTAL MINIMUM SPEND **/
+        Log::info('Parsed DateTime:', ['datetime' => $dateTime->toDateTimeString()]);
+
+        // Hitung minimum spend
         $minimumSpend = 0;
-
         foreach ($request->tables as $tableData) {
             $table = Table::findOrFail($tableData['table_id']);
-            $minimumSpend += ($table->minimun_spend * $tableData['count']);
+            $minimumSpend += $table->minimun_spend * $tableData['count'];
         }
 
-        /** GET USER ID **/
-        $userId = auth()->id() ?? User::first()->user_id;
-
-        /** CREATE RESERVATION **/
+        // Create reservation
         $reservation = TableReservation::create([
             'reservation_id'   => (string) Str::uuid(),
-            'user_id'          => $userId,
+            'user_id'          => Auth::id(),
+            'restaurant_id'    => $request->restaurant_id,
             'reservation_time' => $dateTime,
             'status'           => 'pending',
-            'minimum_spend'    => $minimumSpend,   // ⬅ SIMPAN DI SINI
+            'minimum_spend'    => $minimumSpend
         ]);
 
-        /** INSERT DETAIL TABLE **/
+        // Insert detail tables
         foreach ($request->tables as $tableData) {
             for ($i = 0; $i < $tableData['count']; $i++) {
                 DetailTableReservation::create([
@@ -97,44 +98,28 @@ class TableReservationController extends Controller
 
         DB::commit();
 
+        Log::info('Reservation Created:', ['reservation_id' => $reservation->reservation_id]);
 
-        /** CEK KALO ADA MINIMUM SPEND, REDIRECT KE FOOD PAGE **/
-        if ($minimumSpend > 0) {
-            return response()->json([
-                'success' => true,
-                'redirect_url' => route('food.reservation.page', [
-                    'reservation_id' => $reservation->reservation_id
-                    // Tidak perlu minimum_spend / restaurant_id lagi
-                ])
-            ]);
-        }
+        // Redirect if minimum spend exists - GUNAKAN REDIRECT, BUKAN JSON
+if ($minimumSpend > 0) {
+    return redirect()->route('food.reservation.page', [
+        'reservation_id' => $reservation->reservation_id
+    ])->with('success', 'Reservation created successfully');
+}
 
-        /** TIDAK ADA MINIMUM SPEND **/
-        return response()->json([
-            'success' => true,
-            'message' => 'Reservation created successfully',
-            'data' => [
-                'reservation_id' => $reservation->reservation_id,
-                'customer_name' => $request->name,
-                'reservation_time' => $dateTime->format('Y-m-d H:i:s'),
-                'guests' => $request->guests,
-                'minimum_spend' => $minimumSpend,
-                'status' => $reservation->status
-            ],
-            'redirect_url' => null
-        ], 201);
+        // Jika tidak ada minimum spend, redirect ke halaman success atau back
+        return back()->with('success', 'Reservation created successfully without minimum spend');
 
     } catch (\Exception $e) {
         DB::rollBack();
-
-        return response()->json([
-            'success' => false,
-            'message' => 'Failed to create reservation',
-            'error' => $e->getMessage()
-        ], 500);
+        Log::error('Reservation Error:', [
+            'message' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+        
+        return back()->withErrors(['error' => 'Failed to create reservation: ' . $e->getMessage()]);
     }
 }
-
 
     public function show($id)
     {
@@ -236,20 +221,17 @@ class TableReservationController extends Controller
     public function reservationPage(Request $request)
     {
         $restaurantId = $request->query('restaurant_id');
-        
-        // Jika tidak ada restaurant_id di query, ambil restaurant pertama
+
         if (!$restaurantId) {
             $restaurant = Restaurant::orderBy('created_at', 'asc')->first();
         } else {
             $restaurant = Restaurant::find($restaurantId);
-            
-            // Jika restaurant tidak ditemukan, ambil yang pertama
+
             if (!$restaurant) {
                 $restaurant = Restaurant::orderBy('created_at', 'asc')->first();
             }
         }
-        
-        // Jika tidak ada restaurant sama sekali
+
         if (!$restaurant) {
             return Inertia::render('reservation', [
                 'restaurant' => null,
@@ -257,10 +239,9 @@ class TableReservationController extends Controller
                 'message' => 'Belum ada restoran yang terdaftar.'
             ]);
         }
-        
-        // Ambil tabel berdasarkan restaurant_id
+
         $tables = Table::where('restaurant_id', $restaurant->restaurant_id)->get();
-        
+
         return Inertia::render('reservation', [
             'restaurant' => $restaurant,
             'tables' => $tables

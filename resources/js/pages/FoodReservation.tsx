@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus } from 'lucide-react';
+import { router } from '@inertiajs/react';
 
 interface Menu {
   menu_id: string;
@@ -22,6 +23,7 @@ interface Reservation {
   reservation_time: string;
   guests: number;
   status: string;
+  minimum_spend?: number;
 }
 
 interface Restaurant {
@@ -35,7 +37,8 @@ interface FoodReservationProps {
   restaurant: Restaurant;
   menus: Menu[];
   minimumSpend: number;
-  existingOrders?: any[];
+  snapToken?: string;
+  midtransClientKey: string;
 }
 
 export default function FoodReservation({ 
@@ -43,7 +46,8 @@ export default function FoodReservation({
   restaurant, 
   menus, 
   minimumSpend,
-  existingOrders = []
+  snapToken,
+  midtransClientKey
 }: FoodReservationProps) {
   const [showPopup, setShowPopup] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -51,27 +55,52 @@ export default function FoodReservation({
   const [selectedCategories, setSelectedCategories] = useState<string[]>(['All']);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Load existing orders jika ada
+  // Load Midtrans Snap script
   useEffect(() => {
-    if (existingOrders && existingOrders.length > 0) {
-      const existingCart = existingOrders.map(order => ({
-        ...order.menu,
-        quantity: order.quantity
-      }));
-      setCart(existingCart);
-      
-      const existingNotes: Record<string, string> = {};
-      existingOrders.forEach(order => {
-        if (order.notes) {
-          existingNotes[order.menu_id] = order.notes;
+    const script = document.createElement('script');
+    script.src = 'https://app.midtrans.com/snap/snap.js';
+    script.setAttribute('data-client-key', midtransClientKey);
+    document.body.appendChild(script);
+
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, [midtransClientKey]);
+
+  // Handle payment popup if snapToken exists
+  useEffect(() => {
+    if (snapToken && (window as any).snap) {
+      (window as any).snap.pay(snapToken, {
+        onSuccess: function(result: any) {
+          console.log('Payment success:', result);
+          router.visit('/dashboard', {
+            method: 'get',
+            data: { payment_success: true }
+          });
+        },
+        onPending: function(result: any) {
+          console.log('Payment pending:', result);
+          alert('Payment is pending. Please complete the payment.');
+        },
+        onError: function(result: any) {
+          console.log('Payment error:', result);
+          alert('Payment failed. Please try again.');
+        },
+        onClose: function() {
+          console.log('Payment popup closed');
+          alert('You closed the payment popup. Your order is still pending.');
         }
       });
-      setNotes(existingNotes);
     }
-  }, [existingOrders]);
+  }, [snapToken]);
+
+  // Pastikan menus adalah array
+  const menuList = Array.isArray(menus) ? menus : [];
 
   // Get unique categories from menus
-  const categories = ['All', ...Array.from(new Set(menus.flatMap(menu => menu.category)))];
+  const categories = ['All', ...Array.from(new Set(menuList.flatMap(menu => 
+    Array.isArray(menu.category) ? menu.category : []
+  )))];
 
   const formatRupiah = (amount: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -103,9 +132,9 @@ export default function FoodReservation({
   };
 
   const filteredMenu = selectedCategories.includes('All')
-    ? menus
-    : menus.filter(menu => 
-        selectedCategories.some(cat => menu.category.includes(cat))
+    ? menuList
+    : menuList.filter(menu => 
+        Array.isArray(menu.category) && selectedCategories.some(cat => menu.category.includes(cat))
       );
 
   const addToCart = (menu: Menu) => {
@@ -145,7 +174,7 @@ export default function FoodReservation({
   const service = subtotal * 0.05;
   const total = subtotal + tax + service;
 
-  const handlePlaceOrder = async () => {
+  const handlePlaceOrder = () => {
     if (cart.length === 0) {
       alert('Your cart is empty!');
       return;
@@ -159,57 +188,41 @@ export default function FoodReservation({
 
     setIsProcessing(true);
 
-    try {
-      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-      
-      const orderData = {
-        reservation_id: reservation.reservation_id,
-        items: cart.map(item => ({
-          menu_id: item.menu_id,
-          quantity: item.quantity,
-          notes: notes[item.menu_id] || null
-        }))
-      };
+    const orderData = {
+      reservation_id: reservation.reservation_id,
+      items: cart.map(item => ({
+        menu_id: item.menu_id,
+        quantity: item.quantity,
+        notes: notes[item.menu_id] || null
+      })),
+      subtotal: subtotal,
+      tax: tax,
+      service: service,
+      total: total
+    };
 
-      const response = await fetch('/api/food-reservation', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest',
-          ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {})
-        },
-        body: JSON.stringify(orderData)
-      });
-
-      const contentType = response.headers.get('content-type');
-      
-      if (contentType?.includes('application/json')) {
-        const data = await response.json();
+    router.post('/food-reservation', orderData, {
+      preserveScroll: false,
+      onSuccess: () => {
+        // Payment akan otomatis muncul via snapToken dari response
+      },
+      onError: (errors) => {
+        console.error('Order errors:', errors);
         
-        if (response.ok && data.success) {
-          alert('Food order placed successfully!');
-          // Redirect ke payment atau confirmation page
-          window.location.href = `/reservation/payment/${reservation.reservation_id}`;
-        } else {
-          let errorMessage = data.message || 'Failed to place order';
-          
-          if (data.errors) {
-            const errorList = Object.values(data.errors).flat().join('\n');
-            errorMessage += '\n\n' + errorList;
-          }
-          
-          alert(errorMessage);
+        let errorMessage = 'Failed to place order';
+        
+        if (errors && Object.keys(errors).length > 0) {
+          const errorList = Object.values(errors).flat().join('\n');
+          errorMessage += ':\n\n' + errorList;
         }
-      } else {
-        alert(`Server returned ${response.status} error`);
+        
+        alert(errorMessage);
+        setIsProcessing(false);
+      },
+      onFinish: () => {
+        // Don't set isProcessing false here, wait for payment
       }
-    } catch (error) {
-      console.error('Order error:', error);
-      alert('Failed to place order. Please try again.');
-    } finally {
-      setIsProcessing(false);
-    }
+    });
   };
 
   return (
@@ -217,7 +230,7 @@ export default function FoodReservation({
       {/* Header Info */}
       <div className="bg-white shadow-sm p-6 mb-6">
         <div className="max-w-7xl mx-auto">
-          <h1 className="text-2xl font-bold mb-2">{restaurant.name}</h1>
+          <h1 className="text-2xl font-bold mb-2">{restaurant?.name || 'Restaurant'}</h1>
           <div className="flex gap-6 text-sm text-gray-600">
             <p>Reservation: {new Date(reservation.reservation_time).toLocaleString('id-ID')}</p>
             <p>Guests: {reservation.guests}</p>
@@ -239,7 +252,7 @@ export default function FoodReservation({
               <h2 className="text-xl font-semibold">Your Order ({cart.length} items)</h2>
               <button
                 onClick={() => setShowPopup(true)}
-                className="flex items-center space-x-2 bg-black text-white px-4 py-2 hover:bg-gray-800 transition"
+                className="flex items-center space-x-2 bg-black text-white px-4 py-2 hover:bg-gray-800 transition rounded"
               >
                 <Plus className="w-5 h-5" />
                 <span>Add Food</span>
@@ -255,7 +268,7 @@ export default function FoodReservation({
               <div className="space-y-4">
                 {cart.map((item) => (
                   <div key={item.menu_id} className="flex gap-4 border-b pb-4">
-                    <div className="w-24 h-24 bg-gray-100 flex items-center justify-center overflow-hidden">
+                    <div className="w-24 h-24 bg-gray-100 flex items-center justify-center overflow-hidden rounded">
                       {item.image_url ? (
                         <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
                       ) : (
@@ -267,8 +280,8 @@ export default function FoodReservation({
                         <div>
                           <h3 className="font-semibold">{item.name}</h3>
                           <div className="flex gap-2 mt-1">
-                            {item.category.map((cat, idx) => (
-                              <span key={idx} className="text-xs bg-gray-200 px-2 py-1">
+                            {Array.isArray(item.category) && item.category.map((cat, idx) => (
+                              <span key={idx} className="text-xs bg-gray-200 px-2 py-1 rounded">
                                 {cat}
                               </span>
                             ))}
@@ -282,7 +295,7 @@ export default function FoodReservation({
                         </div>
                         <button
                           onClick={() => removeFromCart(item.menu_id)}
-                          className="text-gray-400 hover:text-gray-600"
+                          className="text-gray-400 hover:text-red-600 transition"
                         >
                           <X className="w-5 h-5" />
                         </button>
@@ -293,20 +306,20 @@ export default function FoodReservation({
                           placeholder="Add note (e.g., no spicy, extra sauce)"
                           value={notes[item.menu_id] || ''}
                           onChange={(e) => updateNote(item.menu_id, e.target.value)}
-                          className="w-full px-3 py-2 border text-sm focus:outline-none focus:ring-2 focus:ring-black"
+                          className="w-full px-3 py-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-black"
                         />
                       </div>
                       <div className="flex items-center space-x-3 mt-3">
                         <button
                           onClick={() => updateQuantity(item.menu_id, -1)}
-                          className="w-8 h-8 border flex items-center justify-center hover:bg-gray-100"
+                          className="w-8 h-8 border rounded flex items-center justify-center hover:bg-gray-100 transition"
                         >
                           -
                         </button>
-                        <span className="font-semibold">{item.quantity}</span>
+                        <span className="font-semibold min-w-[30px] text-center">{item.quantity}</span>
                         <button
                           onClick={() => updateQuantity(item.menu_id, 1)}
-                          className="w-8 h-8 border flex items-center justify-center hover:bg-gray-100"
+                          className="w-8 h-8 border rounded flex items-center justify-center hover:bg-gray-100 transition"
                         >
                           +
                         </button>
@@ -319,12 +332,12 @@ export default function FoodReservation({
           </div>
 
           {/* Price Details */}
-          <div className="bg-white shadow p-6 h-fit">
+          <div className="bg-white shadow p-6 h-fit sticky top-6">
             <h3 className="text-lg font-semibold mb-4">Price Details</h3>
             <div className="space-y-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-600">Subtotal ({cart.length} items)</span>
-                <span>{formatRupiah(subtotal)}</span>
+                <span className="font-medium">{formatRupiah(subtotal)}</span>
               </div>
               {minimumSpend > 0 && (
                 <div className="flex justify-between">
@@ -333,30 +346,30 @@ export default function FoodReservation({
                 </div>
               )}
               {minimumSpend > 0 && subtotal < minimumSpend && (
-                <div className="flex justify-between text-red-600">
+                <div className="flex justify-between text-red-600 bg-red-50 px-2 py-1 rounded">
                   <span className="font-semibold">Still Need</span>
                   <span className="font-semibold">{formatRupiah(minimumSpend - subtotal)}</span>
                 </div>
               )}
               <div className="flex justify-between">
                 <span className="text-gray-600">Tax (10%)</span>
-                <span>{formatRupiah(tax)}</span>
+                <span className="font-medium">{formatRupiah(tax)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Service (5%)</span>
-                <span>{formatRupiah(service)}</span>
+                <span className="font-medium">{formatRupiah(service)}</span>
               </div>
-              <div className="border-t pt-3 flex justify-between font-semibold text-base">
+              <div className="border-t pt-3 flex justify-between font-bold text-base">
                 <span>Total Amount</span>
-                <span>{formatRupiah(total)}</span>
+                <span className="text-lg">{formatRupiah(total)}</span>
               </div>
             </div>
             <button 
               onClick={handlePlaceOrder}
               disabled={cart.length === 0 || isProcessing || (minimumSpend > 0 && subtotal < minimumSpend)}
-              className="w-full bg-black text-white py-3 mt-6 hover:bg-gray-800 transition font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed"
+              className="w-full bg-black text-white py-3 mt-6 hover:bg-gray-800 transition font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed rounded"
             >
-              {isProcessing ? 'Processing...' : 'Place Order →'}
+              {isProcessing ? 'Processing Payment...' : 'Place Order & Pay →'}
             </button>
             {minimumSpend > 0 && subtotal < minimumSpend && (
               <p className="text-xs text-red-600 text-center mt-2">
@@ -371,15 +384,15 @@ export default function FoodReservation({
       {showPopup && (
         <div className="fixed inset-0 flex items-center justify-center p-4 z-50">
           <div 
-            className="absolute inset-0 bg-black bg-opacity-10"
+            className="absolute inset-0 bg-black bg-opacity-50"
             onClick={() => setShowPopup(false)}
           ></div>
-          <div className="bg-white max-w-5xl w-full max-h-[90vh] overflow-y-auto relative z-10 shadow-2xl">
-            <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center z-20">
+          <div className="bg-white max-w-5xl w-full max-h-[90vh] overflow-y-auto relative z-10 shadow-2xl rounded-lg">
+            <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center z-20 rounded-t-lg">
               <h2 className="text-2xl font-semibold">Our Menu</h2>
               <button
                 onClick={() => setShowPopup(false)}
-                className="text-gray-500 hover:text-gray-700"
+                className="text-gray-500 hover:text-gray-700 transition"
               >
                 <X className="w-6 h-6" />
               </button>
@@ -392,7 +405,7 @@ export default function FoodReservation({
                   <button
                     key={category}
                     onClick={() => handleCategoryToggle(category)}
-                    className={`px-4 py-2 text-sm font-medium transition ${
+                    className={`px-4 py-2 text-sm font-medium transition rounded ${
                       selectedCategories.includes(category)
                         ? 'bg-black text-white'
                         : 'bg-white text-gray-700 border hover:bg-gray-100'
@@ -405,42 +418,48 @@ export default function FoodReservation({
             </div>
 
             <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredMenu.map((menu) => (
-                <div key={menu.menu_id} className="border p-4 hover:shadow-lg transition">
-                  <div className="w-full h-32 bg-gray-100 flex items-center justify-center mb-3 overflow-hidden">
-                    {menu.image_url ? (
-                      <img src={menu.image_url} alt={menu.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="text-6xl">🍽️</span>
-                    )}
-                  </div>
-                  <h3 className="font-semibold text-lg mb-2">{menu.name}</h3>
-                  {menu.description && (
-                    <p className="text-sm text-gray-600 mb-2">{menu.description}</p>
-                  )}
-                  <div className="flex gap-1 mb-2 flex-wrap">
-                    {menu.category.map((cat, idx) => (
-                      <span key={idx} className="text-xs bg-gray-200 px-2 py-1">
-                        {cat}
-                      </span>
-                    ))}
-                  </div>
-                  <p className="text-sm text-gray-600 mb-3">
-                    {menu.calories} Cal | Protein: {menu.protein}g | Carbs: {menu.carbs}g
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-lg font-bold">{formatRupiah(menu.price)}</span>
-                    <button
-                      onClick={() => {
-                        addToCart(menu);
-                      }}
-                      className="bg-black text-white px-4 py-2 hover:bg-gray-800 transition"
-                    >
-                      Add to Cart
-                    </button>
-                  </div>
+              {filteredMenu.length === 0 ? (
+                <div className="col-span-full text-center py-12 text-gray-500">
+                  <p>No menu items found in this category</p>
                 </div>
-              ))}
+              ) : (
+                filteredMenu.map((menu) => (
+                  <div key={menu.menu_id} className="border rounded-lg p-4 hover:shadow-lg transition">
+                    <div className="w-full h-32 bg-gray-100 rounded-lg flex items-center justify-center mb-3 overflow-hidden">
+                      {menu.image_url ? (
+                        <img src={menu.image_url} alt={menu.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-6xl">🍽️</span>
+                      )}
+                    </div>
+                    <h3 className="font-semibold text-lg mb-2">{menu.name}</h3>
+                    {menu.description && (
+                      <p className="text-sm text-gray-600 mb-2 line-clamp-2">{menu.description}</p>
+                    )}
+                    <div className="flex gap-1 mb-2 flex-wrap">
+                      {Array.isArray(menu.category) && menu.category.map((cat, idx) => (
+                        <span key={idx} className="text-xs bg-gray-200 px-2 py-1 rounded">
+                          {cat}
+                        </span>
+                      ))}
+                    </div>
+                    <p className="text-sm text-gray-600 mb-3">
+                      {menu.calories} Cal | Protein: {menu.protein}g | Carbs: {menu.carbs}g
+                    </p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-lg font-bold">{formatRupiah(menu.price)}</span>
+                      <button
+                        onClick={() => {
+                          addToCart(menu);
+                        }}
+                        className="bg-black text-white px-4 py-2 rounded hover:bg-gray-800 transition"
+                      >
+                        Add to Cart
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

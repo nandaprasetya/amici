@@ -5,279 +5,304 @@ namespace App\Http\Controllers;
 use App\Models\FoodReservation;
 use App\Models\DetailFoodReservation;
 use App\Models\TableReservation;
-use App\Models\Menu;
 use App\Models\Restaurant;
+use App\Models\Menu;
+use App\Models\Payment;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
-use Illuminate\Support\Facades\Auth;
 
 class FoodReservationController extends Controller
 {
-public function index()
-{
-    $userId = Auth::id();
+    public function index(Request $request)
+    {
+        $userId = Auth::id();
 
-    // Ambil reservation terbaru milik user yang masih pending
-    $reservation = TableReservation::where('user_id', $userId)
-        ->where('status', 'pending')
-        ->latest()
-        ->first();
+        // Ambil reservation terbaru milik user yang masih pending
+        $reservation = TableReservation::where('user_id', $userId)
+            ->where('status', 'pending')
+            ->latest('created_at')
+            ->first();
+        
+        if (!$reservation) {
+            return redirect()->route('reservation.page')
+                ->with('error', 'No pending reservation found. Please create a reservation first.');
+        }
 
-        dd($userId);
-    if (!$reservation) {
-        return redirect()->route('reservation.page')
-            ->with('error', 'No pending reservation found for your account');
+        // Cek apakah sudah ada food reservation
+        $existingFoodReservation = FoodReservation::where('reservation_id', $reservation->reservation_id)->first();
+        
+        if ($existingFoodReservation) {
+            return redirect()->route('reservation.page')
+                ->with('info', 'You have already placed a food order for this reservation.');
+        }
+
+        // Ambil restaurant berdasarkan reservation
+        $restaurant = Restaurant::find($reservation->restaurant_id);
+
+        if (!$restaurant) {
+            return redirect()->route('reservation.page')
+                ->with('error', 'Restaurant not found');
+        }
+
+        // Ambil menu dari restaurant
+        $menus = Menu::where('restaurant_id', $restaurant->restaurant_id)->get();
+        
+        // Transform category jika disimpan sebagai JSON string
+        $menus = $menus->map(function($menu) {
+            if (is_string($menu->category)) {
+                $menu->category = json_decode($menu->category, true) ?? [];
+            }
+            return $menu;
+        });
+
+        return Inertia::render('FoodReservation', [
+            'reservation'   => $reservation,
+            'restaurant'    => $restaurant,
+            'menus'         => $menus,
+            'minimumSpend'  => $reservation->minimum_spend ?? 0,
+            'midtransClientKey' => config('midtrans.client_key')
+        ]);
     }
 
-    // Ambil restaurant berdasarkan reservation
-    $restaurant = Restaurant::find($reservation->restaurant_id);
-
-    // Ambil menu dari restaurant
-    $menus = Menu::where('restaurant_id', $restaurant->restaurant_id)->get();
-
-    // Ambil food reservation jika sudah ada
-    $existingFoodReservation = FoodReservation::where('reservation_id', $reservation->reservation_id)
-        ->with('details.menu')
-        ->first();
-
-    return Inertia::render('FoodReservation', [
-        'reservation'   => $reservation,
-        'restaurant'    => $restaurant,
-        'menus'         => $menus,
-        'minimumSpend'  => $restaurant->minimum_spend ?? 0,
-        'existingFoodReservation' => $existingFoodReservation
-    ]);
-}
-
-
-    public function store(Request $request)
+   public function store(Request $request)
     {
-        $validator = Validator::make($request->all(), [
+        $request->validate([
             'reservation_id' => 'required|exists:table_reservation,reservation_id',
             'items' => 'required|array|min:1',
             'items.*.menu_id' => 'required|exists:menus,menu_id',
             'items.*.quantity' => 'required|integer|min:1',
-            'items.*.notes' => 'nullable|string|max:500',
-            'tax_rate' => 'nullable|numeric|min:0|max:1', // 0.10 untuk 10%
-            'service_rate' => 'nullable|numeric|min:0|max:1' // 0.05 untuk 5%
+            'items.*.notes' => 'nullable|string',
         ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $validator->errors()
-            ], 422);
-        }
 
         try {
             DB::beginTransaction();
 
             $reservation = TableReservation::find($request->reservation_id);
-            
-            // Hapus food reservation lama jika ada (untuk update)
-            $oldFoodReservation = FoodReservation::where('reservation_id', $request->reservation_id)->first();
-            $oldFoodTotal = 0;
-            
-            if ($oldFoodReservation) {
-                $oldFoodTotal = $oldFoodReservation->grand_total;
-                $oldFoodReservation->delete(); // Akan cascade delete details
+
+            if (!$reservation) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Reservation not found'
+                ], 404);
             }
 
-            // Hitung total
+            // Cek apakah sudah ada food reservation
+            $existingFoodReservation = FoodReservation::where('reservation_id', $request->reservation_id)->first();
+            
+            if ($existingFoodReservation) {
+                // Delete existing untuk update
+                $existingFoodReservation->delete();
+            }
+
+            // Hitung total dari items
+            $itemDetails = [];
             $totalFoodPrice = 0;
-            $itemsData = [];
 
             foreach ($request->items as $item) {
-                $menu = Menu::find($item['menu_id']);
-                $subtotal = $menu->price * $item['quantity'];
-                $totalFoodPrice += $subtotal;
+                $menu = Menu::findOrFail($item['menu_id']);
                 
-                $itemsData[] = [
-                    'menu' => $menu,
-                    'quantity' => $item['quantity'],
-                    'price' => $menu->price,
-                    'subtotal' => $subtotal,
-                    'notes' => $item['notes'] ?? null
+                $quantity = (int) $item['quantity'];
+                $price = (float) $menu->price;
+                $subtotal = $quantity * $price;
+
+                $totalFoodPrice += $subtotal;
+
+                // Prepare item untuk Midtrans - PENTING: Harus ada name dan tidak boleh null
+                $itemDetails[] = [
+                    'id' => $menu->menu_id,
+                    'price' => (int) round($price), // Midtrans butuh integer
+                    'quantity' => $quantity,
+                    'name' => $menu->name ?? 'Menu Item', // WAJIB ada name
                 ];
             }
 
             // Calculate tax dan service
-            $taxRate = $request->tax_rate ?? 0.10; // Default 10%
-            $serviceRate = $request->service_rate ?? 0.05; // Default 5%
-            
-            $tax = $totalFoodPrice * $taxRate;
-            $service = $totalFoodPrice * $serviceRate;
+            $tax = $totalFoodPrice * 0.10;
+            $service = $totalFoodPrice * 0.05;
             $grandTotal = $totalFoodPrice + $tax + $service;
 
+            // Add tax dan service ke item_details
+            $itemDetails[] = [
+                'id' => 'TAX-' . time(),
+                'price' => (int) round($tax),
+                'quantity' => 1,
+                'name' => 'Tax 10%', // WAJIB ada name
+            ];
+
+            $itemDetails[] = [
+                'id' => 'SERVICE-' . time(),
+                'price' => (int) round($service),
+                'quantity' => 1,
+                'name' => 'Service Charge 5%', // WAJIB ada name
+            ];
+
+            // PENTING: Hitung ulang gross_amount dari item_details untuk memastikan match
+            $calculatedGrossAmount = 0;
+            foreach ($itemDetails as $item) {
+                $calculatedGrossAmount += $item['price'] * $item['quantity'];
+            }
+
             // Create food reservation
+            $foodReservationId = 'FR-' . strtoupper(Str::random(10));
+            
             $foodReservation = FoodReservation::create([
-                'food_reservation_id' => (string) Str::uuid(),
+                'food_reservation_id' => $foodReservationId,
                 'reservation_id' => $request->reservation_id,
                 'total_food_price' => $totalFoodPrice,
                 'tax' => $tax,
                 'service_charge' => $service,
                 'grand_total' => $grandTotal,
-                'status' => 'pending'
+                'status' => 'pending',
             ]);
 
             // Create detail food reservations
-            foreach ($itemsData as $itemData) {
+            foreach ($request->items as $item) {
+                $menu = Menu::findOrFail($item['menu_id']);
+                
+                $quantity = (int) $item['quantity'];
+                $price = (float) $menu->price;
+                $subtotal = $quantity * $price;
+
                 DetailFoodReservation::create([
                     'detail_food_reservation_id' => (string) Str::uuid(),
                     'food_reservation_id' => $foodReservation->food_reservation_id,
-                    'menu_id' => $itemData['menu']->menu_id,
-                    'quantity' => $itemData['quantity'],
-                    'price' => $itemData['price'],
-                    'subtotal' => $itemData['subtotal'],
-                    'notes' => $itemData['notes']
+                    'menu_id' => $item['menu_id'],
+                    'quantity' => $quantity,
+                    'price' => $price,
+                    'subtotal' => $subtotal,
+                    'notes' => $item['notes'] ?? null,
                 ]);
             }
 
             // Update bill di table reservation
-            // Kurangi old food total, tambah new food total
-            $newBill = ($reservation->bill - $oldFoodTotal) + $grandTotal;
-            
             $reservation->update([
-                'bill' => $newBill
+                'bill' => $reservation->bill + $grandTotal
+            ]);
+
+            // Setup Midtrans
+            \Midtrans\Config::$serverKey = config('midtrans.server_key');
+            \Midtrans\Config::$isProduction = config('midtrans.is_production', false);
+            \Midtrans\Config::$isSanitized = true;
+            \Midtrans\Config::$is3ds = true;
+
+            // Get user info
+            $user = Auth::user();
+
+            // Midtrans transaction params
+            $params = [
+                'transaction_details' => [
+                    'order_id' => $foodReservationId,
+                    'gross_amount' => $calculatedGrossAmount, // HARUS SAMA dengan sum of item_details
+                ],
+                'customer_details' => [
+                    'first_name' => $user->name ?? 'Customer',
+                    'email' => $user->email ?? 'customer@example.com',
+                    'phone' => $user->phone ?? '081234567890',
+                ],
+                'item_details' => $itemDetails,
+            ];
+
+            \Log::info('Midtrans Request:', $params);
+
+            // Get Snap Token
+            $snapToken = \Midtrans\Snap::getSnapToken($params);
+
+            // Simpan payment record
+            Payment::create([
+                'payment_id' => 'PAY-' . strtoupper(Str::random(10)),
+                'food_reservation_id' => $foodReservation->food_reservation_id,
+                'amount' => $grandTotal,
+                'payment_method' => 'midtrans',
+                'payment_status' => 'pending',
+                'snap_token' => $snapToken,
             ]);
 
             DB::commit();
 
+            // Return response dengan snap token
             return response()->json([
                 'success' => true,
                 'message' => 'Food reservation created successfully',
                 'data' => [
                     'food_reservation_id' => $foodReservation->food_reservation_id,
-                    'reservation_id' => $reservation->reservation_id,
-                    'total_food_price' => $totalFoodPrice,
-                    'tax' => $tax,
-                    'service_charge' => $service,
-                    'grand_total' => $grandTotal,
-                    'total_bill' => $newBill,
-                    'items_count' => count($itemsData)
+                    'snap_token' => $snapToken,
+                    'grand_total' => $grandTotal
                 ]
             ], 201);
 
         } catch (\Exception $e) {
             DB::rollBack();
             
+            \Log::error('Food reservation error: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
+            
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to create food reservation',
+                'message' => 'Failed to process order',
                 'error' => $e->getMessage()
             ], 500);
         }
     }
 
-    public function getByReservation($reservationId)
+    // Webhook untuk notifikasi dari Midtrans
+    public function midtransCallback(Request $request)
     {
-        $foodReservation = FoodReservation::where('reservation_id', $reservationId)
-            ->with('details.menu')
-            ->first();
-
-        if (!$foodReservation) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Food reservation not found'
-            ], 404);
-        }
-
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'food_reservation' => $foodReservation,
-                'total_items' => $foodReservation->details->sum('quantity')
-            ]
-        ]);
-    }
-
-    public function update(Request $request, $foodReservationId)
-    {
-        $validator = Validator::make($request->all(), [
-            'status' => 'required|in:pending,confirmed,cancelled'
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $validator->errors()
-            ], 422);
-        }
+        \Midtrans\Config::$serverKey = config('midtrans.server_key');
+        \Midtrans\Config::$isProduction = config('midtrans.is_production', false);
 
         try {
-            $foodReservation = FoodReservation::find($foodReservationId);
-            
-            if (!$foodReservation) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Food reservation not found'
-                ], 404);
+            $notification = new \Midtrans\Notification();
+
+            $orderId = $notification->order_id;
+            $transactionStatus = $notification->transaction_status;
+            $fraudStatus = $notification->fraud_status ?? 'accept';
+
+            \Log::info('Midtrans Notification:', [
+                'order_id' => $orderId,
+                'transaction_status' => $transactionStatus,
+                'fraud_status' => $fraudStatus
+            ]);
+
+            $payment = Payment::where('food_reservation_id', $orderId)->first();
+
+            if (!$payment) {
+                return response()->json(['message' => 'Payment not found'], 404);
             }
 
-            $foodReservation->update([
-                'status' => $request->status
-            ]);
+            $foodReservation = FoodReservation::find($orderId);
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Food reservation status updated',
-                'data' => $foodReservation
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to update food reservation',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
-
-    public function delete($foodReservationId)
-    {
-        try {
-            DB::beginTransaction();
-
-            $foodReservation = FoodReservation::find($foodReservationId);
-            
             if (!$foodReservation) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Food reservation not found'
-                ], 404);
+                return response()->json(['message' => 'Food reservation not found'], 404);
             }
 
-            $reservation = $foodReservation->reservation;
-            $grandTotal = $foodReservation->grand_total;
+            // Update status berdasarkan response Midtrans
+            if ($transactionStatus == 'capture') {
+                if ($fraudStatus == 'accept') {
+                    $payment->payment_status = 'success';
+                    $foodReservation->status = 'confirmed';
+                }
+            } else if ($transactionStatus == 'settlement') {
+                $payment->payment_status = 'success';
+                $foodReservation->status = 'confirmed';
+            } else if ($transactionStatus == 'pending') {
+                $payment->payment_status = 'pending';
+                $foodReservation->status = 'pending';
+            } else if ($transactionStatus == 'deny' || $transactionStatus == 'cancel' || $transactionStatus == 'expire') {
+                $payment->payment_status = 'failed';
+                $foodReservation->status = 'cancelled';
+            }
 
-            // Update bill di table reservation
-            $reservation->update([
-                'bill' => $reservation->bill - $grandTotal
-            ]);
+            $payment->save();
+            $foodReservation->save();
 
-            // Delete food reservation (will cascade delete details)
-            $foodReservation->delete();
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Food reservation deleted successfully'
-            ]);
+            return response()->json(['message' => 'Notification processed successfully']);
 
         } catch (\Exception $e) {
-            DB::rollBack();
-            
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to delete food reservation',
-                'error' => $e->getMessage()
-            ], 500);
+            \Log::error('Midtrans callback error: ' . $e->getMessage());
+            return response()->json(['message' => 'Error processing notification'], 500);
         }
     }
 }

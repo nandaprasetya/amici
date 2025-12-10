@@ -21,6 +21,7 @@ class TableReservation extends Model
     protected $fillable = [
         'reservation_id',
         'user_id',
+        'restaurant_id',
         'reservation_time',
         'status',
         'minimum_spend',

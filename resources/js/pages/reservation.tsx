@@ -196,81 +196,61 @@ export default function Reservation({ restaurant: initialRestaurant, tables: ini
         return total;
     };
 
-    const handleSubmitReservation = async (reserveFood: boolean) => {
+    const handleSubmitReservation = (reserveFood: boolean) => {
     setSubmitting(true);
 
-    // Pastikan waktu valid (05:05 PM)
     const formattedTime = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")} ${period}`;
 
     const formData = {
-        restaurant_id: restaurant?.restaurant_id,
+        restaurant_id: restaurant?.restaurant_id || '',
         name: name,
         date: selected ? formatDateForBackend(selected) : "",
         time: formattedTime,
         guests: guests,
-        tables: selectedTables,
+        tables: selectedTables.map(table => ({
+            table_id: table.table_id,
+            count: table.count
+        })),
         reserve_food: reserveFood
     };
 
-    try {
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-
-        const response = await fetch('/api/reservation', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest',
-                ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {})
-            },
-            body: JSON.stringify(formData)
-        });
-
-        const contentType = response.headers.get('content-type');
-
-        if (contentType?.includes('application/json')) {
-            const data = await response.json();
-
-            if (response.ok && data.success) {
-                if (data.redirect_url) {
-                    router.visit(data.redirect_url);
-                    return;
-                }
-
-                // Jika tidak ada minimum spend → reset form
+    // Gunakan Inertia router untuk POST ke web route
+    router.post('/reservation', formData as any, {
+        preserveScroll: true,
+        onSuccess: (page) => {
+            // Cek jika ada redirect_url di response
+            const props = page.props as any;
+            
+            if (props.redirect_url) {
+                router.visit(props.redirect_url);
+            } else {
+                // Reset form jika berhasil tanpa redirect
                 alert("Reservation confirmed successfully!");
-
                 setName("");
                 setSelected(tomorrow);
                 setGuests(2);
                 setSelectedTables([]);
                 setPolicyChecked(false);
-                return;
-            } else {
-                // Error VALIDATION
-                let message = data.message || "Failed to create reservation";
-
-                if (data.errors) {
-                    message += "\n\n" + Object.values(data.errors).flat().join("\n");
-                }
-
-                alert(message);
-                setSubmitting(false);
             }
-        } else {
-            // Server error non-JSON
-            alert(`Server returned status ${response.status}`);
+            setFoodReservationOpen(false);
+            setSubmitting(false);
+        },
+        onError: (errors) => {
+            // Handle validation errors
+            let message = "Failed to create reservation";
+            
+            if (errors && Object.keys(errors).length > 0) {
+                const errorMessages = Object.values(errors).flat().join('\n');
+                message += ":\n\n" + errorMessages;
+            }
+            
+            alert(message);
+            setSubmitting(false);
+        },
+        onFinish: () => {
             setSubmitting(false);
         }
-
-    } catch (error) {
-        console.error("Error submitting reservation:", error);
-        alert("Failed to submit reservation. Check your connection.");
-        setSubmitting(false);
-    } finally {
-        // Tutup modal food reservation jika ada
-        setFoodReservationOpen(false);
-    }
+    });
 };
 
 
