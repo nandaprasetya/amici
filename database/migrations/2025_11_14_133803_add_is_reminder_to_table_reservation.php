@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('table_reservation', function (Blueprint $table) {
-            $table->boolean('is_reminder')->default(false)->after('bill');
+            $table->boolean('is_reminder')->default(false)->after('minimum_spend');
         });
     }
 

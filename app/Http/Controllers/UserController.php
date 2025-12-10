@@ -131,4 +131,42 @@ class UserController extends Controller
             'message' => 'User berhasil dihapus'
         ]);
     }
+
+    public function login(Request $request)
+    {
+        // Validasi input
+        $credentials = $request->validate([
+            'email' => ['required', 'email'],
+            'password' => ['required']
+        ]);
+
+        // Proses login
+        if (!Auth::attempt($credentials, $request->boolean('remember'))) {
+            throw ValidationException::withMessages([
+                'email' => 'Email atau password salah.',
+            ]);
+        }
+
+        // Regenerate session
+        $request->session()->regenerate();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Login berhasil!',
+            'user' => Auth::user()
+        ]);
+    }
+
+    public function logout(Request $request)
+    {
+        Auth::logout();
+
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Logout berhasil.'
+        ]);
+    }
 }

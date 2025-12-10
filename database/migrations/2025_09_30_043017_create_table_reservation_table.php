@@ -17,7 +17,7 @@ return new class extends Migration
             $table->foreign('user_id')->references('user_id')->on('users')->onDelete('cascade');
             $table->datetime('reservation_time');
             $table->enum('status', ['pending','confirmed','cancelled'])->default('pending');
-            $table->double('bill');
+            $table->double('minimum_spend');
             $table->timestamps();
         });
     }

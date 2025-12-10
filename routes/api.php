@@ -8,6 +8,8 @@ use App\Http\Controllers\TableController;
 use App\Http\Controllers\TableReservationController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\FoodReservationController;
 
 Route::get('/restaurants', [RestaurantController::class, 'index']);
 Route::post('/restaurants', [RestaurantController::class, 'store']);
@@ -51,3 +53,11 @@ Route::post('/users', [UserController::class, 'store']);
 Route::get('/users/{id}', [UserController::class, 'show']);
 Route::put('/users/{id}', [UserController::class, 'update']);
 Route::delete('/users/{id}', [UserController::class, 'destroy']);
+
+Route::post('/payment/create-transaction', [PaymentController::class, 'createTransaction']);
+Route::post('/payment/callback', [PaymentController::class, 'callback']);
+
+Route::post('/food-reservation', [FoodReservationController::class, 'store']);
+Route::get('/food-reservation/{reservationId}', [FoodReservationController::class, 'getByReservation']);
+Route::put('/food-reservation/{foodReservationId}', [FoodReservationController::class, 'update']);
+Route::delete('/food-reservation/{foodReservationId}', [FoodReservationController::class, 'delete']);

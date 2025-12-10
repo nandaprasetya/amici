@@ -5,10 +5,19 @@ use Inertia\Inertia;
 use App\Http\Controllers\RestaurantController;
 use App\Http\Controllers\AppController;
 use App\Http\Controllers\TableReservationController;
+use App\Http\Controllers\FoodReservationController;
 
 Route::get('/', function () {
     return Inertia::render('welcome');
 })->name('home');
+
+// Route::get('/reservation', function () {
+//     return Inertia::render('reservation');
+// })->name('reservationpage');
+
+// Route::get('/reservation/food', function () {
+//     return Inertia::render('FoodReservation');
+// })->name('reservationpage');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', function () {
@@ -26,6 +35,11 @@ Route::prefix('restaurants')->group(function () {
 });
 
 Route::get('/send-reminders', [TableReservationController::class, 'sendReminders']);
+Route::get('/reservation', [TableReservationController::class, 'reservationPage'])->name('reservation.page');
+Route::post('/reservation/store', [TableReservationController::class, 'store'])->name('reservation.store');
+
+Route::get('/reservation/food', [FoodReservationController::class, 'index'])
+    ->name('food.reservation.page');
 
 
 require __DIR__.'/settings.php';

@@ -13,12 +13,17 @@ return new class extends Migration
     {
         Schema::create('tables', function (Blueprint $table) {
             $table->uuid('table_id')->primary();
-            $table->string('table_number');
-            $table->integer('total_chair');
-            $table->double('minimun_spend');
-            $table->double('price');
-            $table->text('desc');
-            $table->timestamps();
+                $table->uuid('restaurant_id');
+                $table->foreign('restaurant_id')
+                    ->references('restaurant_id')
+                    ->on('restaurants')
+                    ->onDelete('cascade');
+                $table->string('table_name');
+                $table->integer('table_number');
+                $table->integer('total_chair');
+                $table->double('minimun_spend');
+                $table->text('desc');
+                $table->timestamps();
         });
     }
 

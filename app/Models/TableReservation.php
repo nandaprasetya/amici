@@ -17,15 +17,17 @@ class TableReservation extends Model
     protected $keyType = 'string';
 
     protected $fillable = [
+        'reservation_id',
         'user_id',
         'reservation_time',
         'status',
-        'bill',
+        'minimum_spend',
         'is_reminder'
     ];
 
     protected $casts = [
         'reservation_time' => 'datetime',
+        'bill' => 'double',
         'is_reminder' => 'boolean'
     ];
 
@@ -48,5 +50,15 @@ class TableReservation extends Model
     public function tables()
     {
         return $this->belongsToMany(Table::class, 'reservation_table', 'reservation_id', 'table_id');
+    }
+
+    public function details()
+    {
+        return $this->hasMany(DetailTableReservation::class, 'reservation_id', 'reservation_id');
+    }
+
+    public function foodReservation()
+    {
+        return $this->hasOne(FoodReservation::class, 'reservation_id', 'reservation_id');
     }
 }

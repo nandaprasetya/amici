@@ -23,10 +23,11 @@ class TableController extends Controller
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'table_number' => 'required|string|max:50',
+            'restaurant_id' => 'required|exists:restaurants,restaurant_id',
+            'table_number' => 'required|integer|max:50',
+            'table_name' => 'required|string',
             'total_chair' => 'required|integer|min:1',
             'minimun_spend' => 'required|numeric|min:0',
-            'price' => 'required|numeric|min:0',
             'desc' => 'nullable|string'
         ]);
 
@@ -38,12 +39,13 @@ class TableController extends Controller
             ], 422);
         }
 
+        // UUID sudah otomatis di model, jadi tidak perlu di-set
         $table = Table::create([
-            'table_id' => Str::uuid(),
+            'restaurant_id' => $request->restaurant_id,
+            'table_name' => $request->table_name,
             'table_number' => $request->table_number,
             'total_chair' => $request->total_chair,
             'minimun_spend' => $request->minimun_spend,
-            'price' => $request->price,
             'desc' => $request->desc
         ]);
 
@@ -83,10 +85,10 @@ class TableController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
+            'restaurant_id' => 'sometimes|exists:restaurants,restaurant_id',
             'table_number' => 'sometimes|string|max:50',
             'total_chair' => 'sometimes|integer|min:1',
             'minimun_spend' => 'sometimes|numeric|min:0',
-            'price' => 'sometimes|numeric|min:0',
             'desc' => 'nullable|string'
         ]);
 
@@ -98,7 +100,14 @@ class TableController extends Controller
             ], 422);
         }
 
-        $table->update($request->all());
+        // Gunakan hanya kolom yang boleh di-update
+        $table->update($request->only([
+            'restaurant_id',
+            'table_number',
+            'total_chair',
+            'minimun_spend',
+            'desc'
+        ]));
 
         return response()->json([
             'success' => true,

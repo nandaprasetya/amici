@@ -49,4 +49,9 @@ class Restaurant extends Model
     {
         return $this->hasMany(Reservation::class, 'restaurant_id', 'restaurant_id');
     }
+
+    public function tables()
+    {
+        return $this->hasMany(Table::class, 'restaurant_id', 'restaurant_id');
+    }
 }

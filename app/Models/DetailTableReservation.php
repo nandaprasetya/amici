@@ -17,6 +17,7 @@ class DetailTableReservation extends Model
     protected $keyType = 'string';
 
     protected $fillable = [
+        'detail_table_reservation_id',
         'table_id',
         'reservation_id',
     ];

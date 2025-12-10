@@ -17,10 +17,11 @@ class Table extends Model
     protected $keyType = 'string';
 
     protected $fillable = [
+        'restaurant_id',
         'table_number',
+        'table_name',
         'total_chair',
         'minimun_spend',
-        'price',
         'desc',
     ];
 
@@ -33,5 +34,13 @@ class Table extends Model
                 $model->{$model->getKeyName()} = (string) Str::uuid();
             }
         });
+    }
+
+    /**
+     * Relasi ke Restaurant (many to one)
+     */
+    public function restaurant()
+    {
+        return $this->belongsTo(Restaurant::class, 'restaurant_id', 'restaurant_id');
     }
 }
