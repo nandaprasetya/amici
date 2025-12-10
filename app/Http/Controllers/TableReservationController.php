@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Inertia\Inertia;
+use App\Models\TableReservation;
 use Illuminate\Support\Facades\Validator;
 use App\Models\TableReservation;
 use App\Models\Restaurant;
@@ -21,7 +23,9 @@ class TableReservationController extends Controller
 {
     public function index()
     {
-        $reservations = TableReservation::all();
+        $reservations = TableReservation::with('user')
+            ->orderBy('reservation_time', 'desc')
+            ->get();
 
         return response()->json([
             'success' => true,
@@ -213,12 +217,14 @@ class TableReservationController extends Controller
             ->get();
 
         foreach ($reservations as $reservation) {
-            Mail::to($reservation->user->email)
-                ->send(new ReservationReminderMail($reservation));
+            if ($reservation->user) {
+                Mail::to($reservation->user->email)
+                    ->send(new ReservationReminderMail($reservation));
 
-            $reservation->update([
-                'is_reminder' => true
-            ]);
+                $reservation->update([
+                    'is_reminder' => true
+                ]);
+            }
         }
 
         return response()->json([

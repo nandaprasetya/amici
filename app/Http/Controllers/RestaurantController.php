@@ -5,111 +5,83 @@ namespace App\Http\Controllers;
 use App\Models\Restaurant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Inertia\Inertia;
 use Illuminate\Support\Facades\Validator;
 
 class RestaurantController extends Controller
 {
     public function index()
     {
-        $restaurants = Restaurant::all();
-        return response()->json([
-            'success' => true,
-            'message' => 'Daftar semua restoran',
-            'data' => $restaurants
-        ], 200);
+        $restaurants = Restaurant::orderBy('created_at', 'desc')->get();
+
+        return Inertia::render('Admin/RestaurantManagement', [
+            'restaurants' => $restaurants
+        ]);
     }
-    public function store(Request $request){
+
+    public function create()
+    {
+
+        return Inertia::render('Admin/CreateRestaurant');
+    }
+
+    public function store(Request $request)
+    {
         $validator = Validator::make($request->all(), [
             'restaurant_name' => 'required|string|max:100',
-            'open_time' => 'required|date_format:H:i',
-            'close_time' => 'required|date_format:H:i|after:open_time',
-            'desc' => 'nullable|string',
+            'open_time'       => 'required',
+            'close_time'      => 'required',
+            'desc'            => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Validasi gagal.',
-                'errors' => $validator->errors()
-            ], 422);
+            return redirect()->back()->withErrors($validator)->withInput();
         }
 
-        $restaurant = Restaurant::create([
+        Restaurant::create([
+            'restaurant_id'   => (string) Str::uuid(),
             'restaurant_name' => $request->restaurant_name,
-            'open_time' => $request->open_time,
-            'close_time' => $request->close_time,
-            'desc' => $request->desc,
+            'open_time'       => $request->open_time,
+            'close_time'      => $request->close_time,
+            'desc'            => $request->desc,
         ]);
 
-        return response()->json([
-            'status' => true,
-            'message' => 'Restaurant berhasil ditambahkan.',
-            'data' => $restaurant
-        ], 201);
+        return redirect()->route('admin.restaurants.index')->with('success', 'Restoran berhasil ditambahkan.');
     }
-
 
     public function show($id)
     {
         $restaurant = Restaurant::find($id);
-
-        if (!$restaurant) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Restoran tidak ditemukan'
-            ], 404);
-        }
-
-        return response()->json([
-            'success' => true,
-            'data' => $restaurant
-        ], 200);
     }
 
     public function update(Request $request, $id)
     {
         $restaurant = Restaurant::find($id);
-
+        
         if (!$restaurant) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Restoran tidak ditemukan'
-            ], 404);
+            return redirect()->back()->with('error', 'Restoran tidak ditemukan.');
         }
 
         $request->validate([
-            'restaurant_name' => 'sometimes|string|max:255',
-            'address' => 'sometimes|string',
-            'phone' => 'nullable|string|max:20',
-            'email' => 'nullable|email',
-            'desc' => 'nullable|string',
+            'restaurant_name' => 'required|string|max:255',
+            'open_time'       => 'required',
+            'close_time'      => 'required',
+            'desc'            => 'nullable|string',
         ]);
 
         $restaurant->update($request->all());
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Data restoran berhasil diperbarui',
-            'data' => $restaurant
-        ], 200);
+        return redirect()->route('admin.restaurants.index')->with('success', 'Data restoran diperbarui.');
     }
 
     public function destroy($id)
     {
         $restaurant = Restaurant::find($id);
-
-        if (!$restaurant) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Restoran tidak ditemukan'
-            ], 404);
+        
+        if ($restaurant) {
+            $restaurant->delete();
         }
-
-        $restaurant->delete();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Restoran berhasil dihapus'
-        ], 200);
+        
+        return redirect()->route('admin.restaurants.index')->with('success', 'Restoran berhasil dihapus.');
     }
 }

@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use Illuminate\Http\Request;
+use Inertia\Inertia;    
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
@@ -51,6 +53,24 @@ class TableReservation extends Model
     {
         return $this->belongsToMany(Table::class, 'reservation_table', 'reservation_id', 'table_id');
     }
+
+    public function userIndex(Request $request)
+    {
+        $userId = $request->user()->user_id;
+
+        $reservations = TableReservation::where('user_id', $userId)
+            ->orderBy('reservation_time', 'desc')
+            ->get();
+
+        return Inertia::render('Customer/Reservation', [
+            'reservations' => $reservations
+        ]);
+    }
+
+    public function restaurant()
+{
+    return $this->belongsTo(Restaurant::class, 'restaurant_id', 'restaurant_id');
+}
 
     public function details()
     {
