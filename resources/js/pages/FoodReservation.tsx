@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus } from 'lucide-react';
-import { router } from '@inertiajs/react';
+import { PageProps as InertiaPageProps, router } from '@inertiajs/core';
+import { usePage } from '@inertiajs/react';
 
 interface Menu {
   menu_id: string;
@@ -13,6 +14,23 @@ interface Menu {
   category: string[];
   description?: string;
 }
+
+declare global {
+  interface Window {
+    snap: {
+      pay: (
+        token: string,
+        callbacks: {
+          onSuccess?: (result: any) => void;
+          onPending?: (result: any) => void;
+          onError?: (result: any) => void;
+          onClose?: () => void;
+        }
+      ) => void;
+    };
+  }
+}
+
 
 interface CartItem extends Menu {
   quantity: number;
@@ -32,72 +50,109 @@ interface Restaurant {
   description?: string;
 }
 
-interface FoodReservationProps {
+interface PageProps extends InertiaPageProps {
   reservation: Reservation;
   restaurant: Restaurant;
   menus: Menu[];
   minimumSpend: number;
-  snapToken?: string;
+  flash: {
+    snapToken?: string;
+    message?: string;
+    error?: string;
+  };
   midtransClientKey: string;
 }
 
-export default function FoodReservation({ 
-  reservation, 
-  restaurant, 
-  menus, 
-  minimumSpend,
-  snapToken,
-  midtransClientKey
-}: FoodReservationProps) {
+export default function FoodReservation() {
+  const { reservation, restaurant, menus, minimumSpend, flash, midtransClientKey } = usePage<PageProps>().props;
+  
   const [showPopup, setShowPopup] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [selectedCategories, setSelectedCategories] = useState<string[]>(['All']);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [snapLoaded, setSnapLoaded] = useState(false);
 
   // Load Midtrans Snap script
   useEffect(() => {
+    console.log('Loading Midtrans script with client key:', midtransClientKey);
+    
     const script = document.createElement('script');
-    script.src = 'https://app.midtrans.com/snap/snap.js';
+    script.src = 'https://app.sandbox.midtrans.com/snap/snap.js';
     script.setAttribute('data-client-key', midtransClientKey);
+    
+    script.onload = () => {
+      console.log('✅ Midtrans Snap script loaded successfully');
+      setSnapLoaded(true);
+    };
+    
+    script.onerror = () => {
+      console.error('❌ Failed to load Midtrans Snap script');
+      alert('Failed to load payment system. Please refresh the page.');
+    };
+    
     document.body.appendChild(script);
 
     return () => {
-      document.body.removeChild(script);
+      if (document.body.contains(script)) {
+        document.body.removeChild(script);
+      }
     };
   }, [midtransClientKey]);
 
-  // Handle payment popup if snapToken exists
+  // Handle snap token from flash session
   useEffect(() => {
-    if (snapToken && (window as any).snap) {
-      (window as any).snap.pay(snapToken, {
+    console.log('Flash data:', flash);
+    
+    if (flash?.snapToken) {
+      console.log('📦 Snap token received from backend:', flash.snapToken);
+      
+      if (!snapLoaded) {
+        console.log('⏳ Waiting for Midtrans script to load...');
+        return;
+      }
+      
+      if (typeof (window as any).snap === 'undefined') {
+        console.error('❌ Midtrans snap is undefined');
+        alert('Payment system not ready. Please refresh the page.');
+        return;
+      }
+      
+      console.log('🚀 Opening Midtrans payment popup');
+      
+      (window as any).snap.pay(flash.snapToken, {
         onSuccess: function(result: any) {
-          console.log('Payment success:', result);
+          console.log('✅ Payment success:', result);
+          alert('Payment successful! Thank you for your order.');
           router.visit('/dashboard', {
-            method: 'get',
-            data: { payment_success: true }
+            data: { payment: 'success' }
           });
         },
         onPending: function(result: any) {
-          console.log('Payment pending:', result);
-          alert('Payment is pending. Please complete the payment.');
+          console.log('⏳ Payment pending:', result);
+          alert('Payment is pending. Please complete your payment.');
+          router.visit('/dashboard', {
+            data: { payment: 'pending' }
+          });
         },
         onError: function(result: any) {
-          console.log('Payment error:', result);
+          console.error('❌ Payment error:', result);
           alert('Payment failed. Please try again.');
+          setIsProcessing(false);
         },
         onClose: function() {
-          console.log('Payment popup closed');
-          alert('You closed the payment popup. Your order is still pending.');
+          console.log('🔒 Payment popup closed');
+          alert('Payment window closed. Your order is saved.');
+          setIsProcessing(false);
+          // Clear snapToken from session
+          router.reload({ only: ['flash'] });
         }
       });
     }
-  }, [snapToken]);
+  }, [flash?.snapToken, snapLoaded]);
 
-  // Pastikan menus adalah array
   const menuList = Array.isArray(menus) ? menus : [];
 
-  // Get unique categories from menus
   const categories = ['All', ...Array.from(new Set(menuList.flatMap(menu => 
     Array.isArray(menu.category) ? menu.category : []
   )))];
@@ -174,56 +229,104 @@ export default function FoodReservation({
   const service = subtotal * 0.05;
   const total = subtotal + tax + service;
 
-  const handlePlaceOrder = () => {
-    if (cart.length === 0) {
-      alert('Your cart is empty!');
-      return;
-    }
+  const handlePlaceOrder = async () => {
+  console.log('🛒 Place Order clicked');
 
-    // Check minimum spend
-    if (minimumSpend > 0 && subtotal < minimumSpend) {
-      alert(`Minimum spend required: ${formatRupiah(minimumSpend)}\nCurrent subtotal: ${formatRupiah(subtotal)}\nPlease add ${formatRupiah(minimumSpend - subtotal)} more to proceed.`);
-      return;
-    }
+  if (cart.length === 0) {
+    alert('Your cart is empty!');
+    return;
+  }
 
-    setIsProcessing(true);
+  if (!snapLoaded) {
+    alert('Payment system is still loading. Please wait...');
+    return;
+  }
 
-    const orderData = {
-      reservation_id: reservation.reservation_id,
-      items: cart.map(item => ({
-        menu_id: item.menu_id,
-        quantity: item.quantity,
-        notes: notes[item.menu_id] || null
-      })),
-      subtotal: subtotal,
-      tax: tax,
-      service: service,
-      total: total
-    };
+  if (minimumSpend > 0 && subtotal < minimumSpend) {
+    alert(`Minimum spend: ${formatRupiah(minimumSpend)}`);
+    return;
+  }
 
-    router.post('/food-reservation', orderData, {
-      preserveScroll: false,
-      onSuccess: () => {
-        // Payment akan otomatis muncul via snapToken dari response
-      },
-      onError: (errors) => {
-        console.error('Order errors:', errors);
-        
-        let errorMessage = 'Failed to place order';
-        
-        if (errors && Object.keys(errors).length > 0) {
-          const errorList = Object.values(errors).flat().join('\n');
-          errorMessage += ':\n\n' + errorList;
-        }
-        
-        alert(errorMessage);
-        setIsProcessing(false);
-      },
-      onFinish: () => {
-        // Don't set isProcessing false here, wait for payment
-      }
-    });
+  setIsProcessing(true);
+
+  const orderData = {
+    reservation_id: reservation.reservation_id,
+    items: cart.map(item => ({
+      menu_id: item.menu_id,
+      quantity: item.quantity,
+      notes: notes[item.menu_id] || null
+    })),
+    subtotal,
+    tax,
+    service,
+    total
   };
+
+  try {
+    const csrfToken =
+      (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)
+        ?.content ?? '';
+
+    const response = await fetch('/api/food-reservation', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': csrfToken,
+      },
+      body: JSON.stringify(orderData),
+    });
+
+    const data = await response.json();
+    console.log('📥 API Response:', data);
+
+    if (!response.ok) {
+      alert('❌ Failed: ' + (data.message ?? 'Unknown error'));
+      setIsProcessing(false);
+      return;
+    }
+
+    // ambil token, mendukung dua format: snap_token atau snapToken
+    const snapToken = data.snap_token || data.snapToken;
+
+    if (!snapToken) {
+      alert("❌ Snap token not found in API response.");
+      setIsProcessing(false);
+      return;
+    }
+
+    console.log("💳 Opening Midtrans Snap popup with token:", snapToken);
+
+    window.snap.pay(data.snapToken, {
+        onSuccess: function(result: any) {
+          alert('Payment success!');
+          console.log(result);
+          setCart([]);
+          setNotes({});
+          router.visit('/');
+        },
+        onPending: function(result: any) {
+          alert('Payment pending');
+          console.log(result);
+        },
+        onError: function(result: any) {
+          alert('Payment failed');
+          console.log(result);
+        },
+        onClose: function() {
+          alert('Payment popup closed');
+        }
+      });
+
+  } catch (e) {
+    console.error('❌ Network error:', e);
+    alert('Network error. Please try again.');
+  } finally {
+    setIsProcessing(false);
+  }
+};
+
+
+
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -252,7 +355,7 @@ export default function FoodReservation({
               <h2 className="text-xl font-semibold">Your Order ({cart.length} items)</h2>
               <button
                 onClick={() => setShowPopup(true)}
-                className="flex items-center space-x-2 bg-black text-white px-4 py-2 hover:bg-gray-800 transition rounded"
+                className="flex items-center space-x-2 bg-black text-white px-4 py-2 hover:bg-gray-800 transition"
               >
                 <Plus className="w-5 h-5" />
                 <span>Add Food</span>
@@ -268,7 +371,7 @@ export default function FoodReservation({
               <div className="space-y-4">
                 {cart.map((item) => (
                   <div key={item.menu_id} className="flex gap-4 border-b pb-4">
-                    <div className="w-24 h-24 bg-gray-100 flex items-center justify-center overflow-hidden rounded">
+                    <div className="w-24 h-24 bg-gray-100 flex items-center justify-center overflow-hidden">
                       {item.image_url ? (
                         <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
                       ) : (
@@ -281,7 +384,7 @@ export default function FoodReservation({
                           <h3 className="font-semibold">{item.name}</h3>
                           <div className="flex gap-2 mt-1">
                             {Array.isArray(item.category) && item.category.map((cat, idx) => (
-                              <span key={idx} className="text-xs bg-gray-200 px-2 py-1 rounded">
+                              <span key={idx} className="text-xs bg-gray-200 px-2 py-1">
                                 {cat}
                               </span>
                             ))}
@@ -306,20 +409,20 @@ export default function FoodReservation({
                           placeholder="Add note (e.g., no spicy, extra sauce)"
                           value={notes[item.menu_id] || ''}
                           onChange={(e) => updateNote(item.menu_id, e.target.value)}
-                          className="w-full px-3 py-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-black"
+                          className="w-full px-3 py-2 border text-sm focus:outline-none focus:ring-2 focus:ring-black"
                         />
                       </div>
                       <div className="flex items-center space-x-3 mt-3">
                         <button
                           onClick={() => updateQuantity(item.menu_id, -1)}
-                          className="w-8 h-8 border rounded flex items-center justify-center hover:bg-gray-100 transition"
+                          className="w-8 h-8 border flex items-center justify-center hover:bg-gray-100 transition"
                         >
                           -
                         </button>
                         <span className="font-semibold min-w-[30px] text-center">{item.quantity}</span>
                         <button
                           onClick={() => updateQuantity(item.menu_id, 1)}
-                          className="w-8 h-8 border rounded flex items-center justify-center hover:bg-gray-100 transition"
+                          className="w-8 h-8 border flex items-center justify-center hover:bg-gray-100 transition"
                         >
                           +
                         </button>
@@ -346,7 +449,7 @@ export default function FoodReservation({
                 </div>
               )}
               {minimumSpend > 0 && subtotal < minimumSpend && (
-                <div className="flex justify-between text-red-600 bg-red-50 px-2 py-1 rounded">
+                <div className="flex justify-between text-red-600 bg-red-50 px-2 py-1">
                   <span className="font-semibold">Still Need</span>
                   <span className="font-semibold">{formatRupiah(minimumSpend - subtotal)}</span>
                 </div>
@@ -366,10 +469,10 @@ export default function FoodReservation({
             </div>
             <button 
               onClick={handlePlaceOrder}
-              disabled={cart.length === 0 || isProcessing || (minimumSpend > 0 && subtotal < minimumSpend)}
-              className="w-full bg-black text-white py-3 mt-6 hover:bg-gray-800 transition font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed rounded"
+              disabled={cart.length === 0 || isProcessing || !snapLoaded || (minimumSpend > 0 && subtotal < minimumSpend)}
+              className="w-full bg-black text-white py-3 mt-6 hover:bg-gray-800 transition font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
-              {isProcessing ? 'Processing Payment...' : 'Place Order & Pay →'}
+              {!snapLoaded ? 'Loading Payment System...' : isProcessing ? 'Processing...' : 'Place Order & Pay →'}
             </button>
             {minimumSpend > 0 && subtotal < minimumSpend && (
               <p className="text-xs text-red-600 text-center mt-2">
@@ -384,11 +487,11 @@ export default function FoodReservation({
       {showPopup && (
         <div className="fixed inset-0 flex items-center justify-center p-4 z-50">
           <div 
-            className="absolute inset-0 bg-black bg-opacity-50"
+            className="absolute inset-0 bg-black bg-opacity-10"
             onClick={() => setShowPopup(false)}
           ></div>
-          <div className="bg-white max-w-5xl w-full max-h-[90vh] overflow-y-auto relative z-10 shadow-2xl rounded-lg">
-            <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center z-20 rounded-t-lg">
+          <div className="bg-white max-w-5xl w-full max-h-[90vh] overflow-y-auto relative z-10 shadow-2xl">
+            <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center z-20">
               <h2 className="text-2xl font-semibold">Our Menu</h2>
               <button
                 onClick={() => setShowPopup(false)}
@@ -398,14 +501,13 @@ export default function FoodReservation({
               </button>
             </div>
             
-            {/* Category Filter */}
             <div className="px-6 py-4 border-b bg-gray-50">
               <div className="flex gap-2 flex-wrap">
                 {categories.map((category) => (
                   <button
                     key={category}
                     onClick={() => handleCategoryToggle(category)}
-                    className={`px-4 py-2 text-sm font-medium transition rounded ${
+                    className={`px-4 py-2 text-sm font-medium transition ${
                       selectedCategories.includes(category)
                         ? 'bg-black text-white'
                         : 'bg-white text-gray-700 border hover:bg-gray-100'
@@ -424,8 +526,8 @@ export default function FoodReservation({
                 </div>
               ) : (
                 filteredMenu.map((menu) => (
-                  <div key={menu.menu_id} className="border rounded-lg p-4 hover:shadow-lg transition">
-                    <div className="w-full h-32 bg-gray-100 rounded-lg flex items-center justify-center mb-3 overflow-hidden">
+                  <div key={menu.menu_id} className="border p-4 hover:shadow-lg transition">
+                    <div className="w-full h-32 bg-gray-100 flex items-center justify-center mb-3 overflow-hidden">
                       {menu.image_url ? (
                         <img src={menu.image_url} alt={menu.name} className="w-full h-full object-cover" />
                       ) : (
@@ -438,7 +540,7 @@ export default function FoodReservation({
                     )}
                     <div className="flex gap-1 mb-2 flex-wrap">
                       {Array.isArray(menu.category) && menu.category.map((cat, idx) => (
-                        <span key={idx} className="text-xs bg-gray-200 px-2 py-1 rounded">
+                        <span key={idx} className="text-xs bg-gray-200 px-2 py-1">
                           {cat}
                         </span>
                       ))}
@@ -449,10 +551,8 @@ export default function FoodReservation({
                     <div className="flex items-center justify-between">
                       <span className="text-lg font-bold">{formatRupiah(menu.price)}</span>
                       <button
-                        onClick={() => {
-                          addToCart(menu);
-                        }}
-                        className="bg-black text-white px-4 py-2 rounded hover:bg-gray-800 transition"
+                        onClick={() => addToCart(menu)}
+                        className="bg-black text-white px-4 py-2 hover:bg-gray-800 transition"
                       >
                         Add to Cart
                       </button>

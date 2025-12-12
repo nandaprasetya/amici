@@ -11,6 +11,7 @@ use App\Models\Payment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 
@@ -20,7 +21,6 @@ class FoodReservationController extends Controller
     {
         $userId = Auth::id();
 
-        // Ambil reservation terbaru milik user yang masih pending
         $reservation = TableReservation::where('user_id', $userId)
             ->where('status', 'pending')
             ->latest('created_at')
@@ -31,7 +31,6 @@ class FoodReservationController extends Controller
                 ->with('error', 'No pending reservation found. Please create a reservation first.');
         }
 
-        // Cek apakah sudah ada food reservation
         $existingFoodReservation = FoodReservation::where('reservation_id', $reservation->reservation_id)->first();
         
         if ($existingFoodReservation) {
@@ -39,7 +38,6 @@ class FoodReservationController extends Controller
                 ->with('info', 'You have already placed a food order for this reservation.');
         }
 
-        // Ambil restaurant berdasarkan reservation
         $restaurant = Restaurant::find($reservation->restaurant_id);
 
         if (!$restaurant) {
@@ -47,10 +45,8 @@ class FoodReservationController extends Controller
                 ->with('error', 'Restaurant not found');
         }
 
-        // Ambil menu dari restaurant
         $menus = Menu::where('restaurant_id', $restaurant->restaurant_id)->get();
         
-        // Transform category jika disimpan sebagai JSON string
         $menus = $menus->map(function($menu) {
             if (is_string($menu->category)) {
                 $menu->category = json_decode($menu->category, true) ?? [];
@@ -63,12 +59,15 @@ class FoodReservationController extends Controller
             'restaurant'    => $restaurant,
             'menus'         => $menus,
             'minimumSpend'  => $reservation->minimum_spend ?? 0,
-            'midtransClientKey' => config('midtrans.client_key')
+            'midtransClientKey' => config('midtrans.client_key'),
         ]);
     }
 
-   public function store(Request $request)
+    public function store(Request $request)
     {
+        Log::info('=== FOOD RESERVATION STORE START ===');
+        Log::info('Request Data:', $request->all());
+
         $request->validate([
             'reservation_id' => 'required|exists:table_reservation,reservation_id',
             'items' => 'required|array|min:1',
@@ -83,21 +82,16 @@ class FoodReservationController extends Controller
             $reservation = TableReservation::find($request->reservation_id);
 
             if (!$reservation) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Reservation not found'
-                ], 404);
+                throw new \Exception('Reservation not found');
             }
 
-            // Cek apakah sudah ada food reservation
+            // Delete existing food reservation if any
             $existingFoodReservation = FoodReservation::where('reservation_id', $request->reservation_id)->first();
-            
             if ($existingFoodReservation) {
-                // Delete existing untuk update
                 $existingFoodReservation->delete();
             }
 
-            // Hitung total dari items
+            // Calculate totals and build item details
             $itemDetails = [];
             $totalFoodPrice = 0;
 
@@ -110,40 +104,54 @@ class FoodReservationController extends Controller
 
                 $totalFoodPrice += $subtotal;
 
-                // Prepare item untuk Midtrans - PENTING: Harus ada name dan tidak boleh null
+                // Add menu item to Midtrans item_details
                 $itemDetails[] = [
                     'id' => $menu->menu_id,
-                    'price' => (int) round($price), // Midtrans butuh integer
+                    'price' => (int) round($price),
                     'quantity' => $quantity,
-                    'name' => $menu->name ?? 'Menu Item', // WAJIB ada name
+                    'name' => $menu->menu_name,
                 ];
             }
 
-            // Calculate tax dan service
+            // Calculate tax and service
             $tax = $totalFoodPrice * 0.10;
             $service = $totalFoodPrice * 0.05;
             $grandTotal = $totalFoodPrice + $tax + $service;
 
-            // Add tax dan service ke item_details
+            // Round to integer for Midtrans
+            $taxInt = (int) round($tax);
+            $serviceInt = (int) round($service);
+            $grandTotalInt = (int) round($grandTotal);
+
+            // Add tax and service as separate items
             $itemDetails[] = [
                 'id' => 'TAX-' . time(),
-                'price' => (int) round($tax),
+                'price' => $taxInt,
                 'quantity' => 1,
-                'name' => 'Tax 10%', // WAJIB ada name
+                'name' => 'Tax (10%)',
             ];
 
             $itemDetails[] = [
                 'id' => 'SERVICE-' . time(),
-                'price' => (int) round($service),
+                'price' => $serviceInt,
                 'quantity' => 1,
-                'name' => 'Service Charge 5%', // WAJIB ada name
+                'name' => 'Service Charge (5%)',
             ];
 
-            // PENTING: Hitung ulang gross_amount dari item_details untuk memastikan match
+            // Calculate gross amount from item_details to ensure it matches
             $calculatedGrossAmount = 0;
             foreach ($itemDetails as $item) {
                 $calculatedGrossAmount += $item['price'] * $item['quantity'];
             }
+
+            Log::info('Calculated amounts:', [
+                'total_food_price' => $totalFoodPrice,
+                'tax' => $tax,
+                'service' => $service,
+                'grand_total' => $grandTotal,
+                'calculated_gross_amount' => $calculatedGrossAmount,
+                'item_details' => $itemDetails
+            ]);
 
             // Create food reservation
             $foodReservationId = 'FR-' . strtoupper(Str::random(10));
@@ -157,6 +165,8 @@ class FoodReservationController extends Controller
                 'grand_total' => $grandTotal,
                 'status' => 'pending',
             ]);
+
+            Log::info('Food reservation created:', ['id' => $foodReservationId]);
 
             // Create detail food reservations
             foreach ($request->items as $item) {
@@ -177,7 +187,7 @@ class FoodReservationController extends Controller
                 ]);
             }
 
-            // Update bill di table reservation
+            // Update reservation bill
             $reservation->update([
                 'bill' => $reservation->bill + $grandTotal
             ]);
@@ -188,14 +198,18 @@ class FoodReservationController extends Controller
             \Midtrans\Config::$isSanitized = true;
             \Midtrans\Config::$is3ds = true;
 
-            // Get user info
+            Log::info('Midtrans Config:', [
+                'server_key' => substr(config('midtrans.server_key'), 0, 10) . '...',
+                'is_production' => config('midtrans.is_production'),
+            ]);
+
             $user = Auth::user();
 
-            // Midtrans transaction params
+            // Midtrans params - use calculated gross amount to ensure match
             $params = [
                 'transaction_details' => [
                     'order_id' => $foodReservationId,
-                    'gross_amount' => $calculatedGrossAmount, // HARUS SAMA dengan sum of item_details
+                    'gross_amount' => $calculatedGrossAmount,
                 ],
                 'customer_details' => [
                     'first_name' => $user->name ?? 'Customer',
@@ -205,12 +219,23 @@ class FoodReservationController extends Controller
                 'item_details' => $itemDetails,
             ];
 
-            \Log::info('Midtrans Request:', $params);
+            Log::info('Midtrans Request Params:', $params);
+
+            // Verify that gross_amount matches sum of items
+            $itemSum = array_sum(array_map(function($item) {
+                return $item['price'] * $item['quantity'];
+            }, $itemDetails));
+
+            if ($params['transaction_details']['gross_amount'] !== $itemSum) {
+                throw new \Exception("Gross amount mismatch: {$params['transaction_details']['gross_amount']} vs {$itemSum}");
+            }
 
             // Get Snap Token
             $snapToken = \Midtrans\Snap::getSnapToken($params);
 
-            // Simpan payment record
+            Log::info('Snap Token Generated:', ['token' => $snapToken]);
+
+            // Save payment record
             Payment::create([
                 'payment_id' => 'PAY-' . strtoupper(Str::random(10)),
                 'food_reservation_id' => $foodReservation->food_reservation_id,
@@ -222,32 +247,32 @@ class FoodReservationController extends Controller
 
             DB::commit();
 
-            // Return response dengan snap token
+            Log::info('=== FOOD RESERVATION STORE SUCCESS ===');
+
+            // Return with snap token in session
+            // return redirect()->back()->with('snapToken', $snapToken);
             return response()->json([
-                'success' => true,
-                'message' => 'Food reservation created successfully',
-                'data' => [
-                    'food_reservation_id' => $foodReservation->food_reservation_id,
-                    'snap_token' => $snapToken,
-                    'grand_total' => $grandTotal
-                ]
-            ], 201);
+            'message' => 'Order created successfully',
+            'snapToken' => $snapToken, // <---- INI YANG FRONTEND PAKAI
+            'reservationId' => $foodReservation->food_reservation_id,
+        ], 201);
 
         } catch (\Exception $e) {
             DB::rollBack();
             
-            \Log::error('Food reservation error: ' . $e->getMessage());
-            \Log::error('Stack trace: ' . $e->getTraceAsString());
+            Log::error('=== FOOD RESERVATION ERROR ===');
+            Log::error('Error Message: ' . $e->getMessage());
+            Log::error('Stack Trace: ' . $e->getTraceAsString());
             
+            // return redirect()->back()->withErrors([
+            //     'error' => 'Failed to process order: ' . $e->getMessage()
+            // ]);
             return response()->json([
-                'success' => false,
-                'message' => 'Failed to process order',
-                'error' => $e->getMessage()
-            ], 500);
+            'error' => $e->getMessage(),
+        ], 500);
         }
     }
 
-    // Webhook untuk notifikasi dari Midtrans
     public function midtransCallback(Request $request)
     {
         \Midtrans\Config::$serverKey = config('midtrans.server_key');
@@ -260,7 +285,7 @@ class FoodReservationController extends Controller
             $transactionStatus = $notification->transaction_status;
             $fraudStatus = $notification->fraud_status ?? 'accept';
 
-            \Log::info('Midtrans Notification:', [
+            Log::info('Midtrans Notification:', [
                 'order_id' => $orderId,
                 'transaction_status' => $transactionStatus,
                 'fraud_status' => $fraudStatus
@@ -278,7 +303,6 @@ class FoodReservationController extends Controller
                 return response()->json(['message' => 'Food reservation not found'], 404);
             }
 
-            // Update status berdasarkan response Midtrans
             if ($transactionStatus == 'capture') {
                 if ($fraudStatus == 'accept') {
                     $payment->payment_status = 'success';
@@ -301,7 +325,7 @@ class FoodReservationController extends Controller
             return response()->json(['message' => 'Notification processed successfully']);
 
         } catch (\Exception $e) {
-            \Log::error('Midtrans callback error: ' . $e->getMessage());
+            Log::error('Midtrans callback error: ' . $e->getMessage());
             return response()->json(['message' => 'Error processing notification'], 500);
         }
     }

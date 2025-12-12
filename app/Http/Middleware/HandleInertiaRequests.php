@@ -40,6 +40,12 @@ class HandleInertiaRequests extends Middleware
         'auth' => [
             'user' => $request->user() ? $request->user()->load('role') : null,
         ],
+        'flash' => [
+            'message' => fn () => $request->session()->get('message'),
+            'error' => fn () => $request->session()->get('error'),
+            'snapToken' => fn () => $request->session()->get('snapToken'),
+        ],
+        'midtransClientKey' => config('midtrans.client_key'),
     ]);
 }
 
