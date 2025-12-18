@@ -14,7 +14,7 @@ class ReservationReminderMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    public TableReservation  $reservation;
+    public TableReservation $reservation;
 
     /**
      * Create a new message instance.
@@ -40,7 +40,7 @@ class ReservationReminderMail extends Mailable
     public function content(): Content
     {
         return new Content(
-            view: 'emails.reminder',
+            markdown: 'emails.reminder',
         );
     }
 

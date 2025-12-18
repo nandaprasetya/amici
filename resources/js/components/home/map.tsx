@@ -1,39 +1,59 @@
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
-import L from "leaflet";
+import L, { CRS } from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-const iconCamera = new L.Icon({
-    iconUrl: "/icons/camera.png",
-    iconSize: [32, 32],
-});
+const TILE_SIZE = 1200;
+const GRID_SIZE = 3;
+const MAP_SIZE = TILE_SIZE * GRID_SIZE; // 2048
+
+const bounds: [[number, number], [number, number]] = [
+    [0, 0],
+    [MAP_SIZE, MAP_SIZE],
+];
 
 const iconFood = new L.Icon({
     iconUrl: "/icons/food.png",
     iconSize: [32, 32],
+    iconAnchor: [16, 32],
+});
+
+const iconCamera = new L.Icon({
+    iconUrl: "/icons/camera.png",
+    iconSize: [32, 32],
+    iconAnchor: [16, 32],
 });
 
 export default function Map() {
     return (
         <section className="bg-[#f9f6f1] py-12 flex flex-col items-center">
-            <h1 className="text-3xl md:text-5xl font-semibold text-center mb-6 text-[#372207]">
-                Welcome to <span className="text-[#0f172a]">Amici Culinary City</span>
+            <h1 className="text-3xl md:text-5xl font-semibold text-center mb-6">
+                Amici Culinary City
             </h1>
 
             <div className="w-[90%] md:w-[80%] h-[600px] rounded-2xl overflow-hidden shadow-lg">
                 <MapContainer
-                    center={[-8.65, 115.2]}
-                    zoom={15}
+                    crs={CRS.Simple}
+                    bounds={bounds}
+                    maxBounds={bounds}
+                    maxBoundsViscosity={1.0}
+                    zoom={-1}
+                    minZoom={-1}
+                    maxZoom={0}
                     scrollWheelZoom={false}
                     className="h-full w-full"
-                >
+                    >
                     <TileLayer
-                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                        attribution="© OpenStreetMap contributors"
+                        url="/asset/map/0/{x}/{y}.png"
+                        tileSize={1200}
+                        bounds={bounds}
+                        noWrap={true}
                     />
-                    <Marker position={[-8.6501, 115.21]} icon={iconFood}>
+
+                    <Marker position={[900, 1100]} icon={iconFood}>
                         <Popup>Amici Restaurant</Popup>
                     </Marker>
-                    <Marker position={[-8.651, 115.205]} icon={iconCamera}>
+
+                    <Marker position={[600, 1500]} icon={iconCamera}>
                         <Popup>Photo Spot Garden</Popup>
                     </Marker>
                 </MapContainer>

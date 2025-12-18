@@ -5,11 +5,11 @@ import { usePage } from '@inertiajs/react';
 
 interface Menu {
   menu_id: string;
-  name: string;
+  menu_name: string;
   image_url: string;
   calories: number;
   protein: number;
-  carbs: number;
+  carbo: number;
   price: number;
   category: string[];
   description?: string;
@@ -373,7 +373,7 @@ export default function FoodReservation() {
                   <div key={item.menu_id} className="flex gap-4 border-b pb-4">
                     <div className="w-24 h-24 bg-gray-100 flex items-center justify-center overflow-hidden">
                       {item.image_url ? (
-                        <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
+                        <img src={item.image_url} alt={item.menu_name} className="w-full h-full object-cover" />
                       ) : (
                         <span className="text-4xl">🍽️</span>
                       )}
@@ -381,7 +381,7 @@ export default function FoodReservation() {
                     <div className="flex-1">
                       <div className="flex justify-between items-start">
                         <div>
-                          <h3 className="font-semibold">{item.name}</h3>
+                          <h3 className="font-semibold">{item.menu_name}</h3>
                           <div className="flex gap-2 mt-1">
                             {Array.isArray(item.category) && item.category.map((cat, idx) => (
                               <span key={idx} className="text-xs bg-gray-200 px-2 py-1">
@@ -390,7 +390,7 @@ export default function FoodReservation() {
                             ))}
                           </div>
                           <p className="text-sm text-gray-600 mt-1">
-                            {item.calories} Cal | Protein: {item.protein}g | Carbs: {item.carbs}g
+                            {item.calories} Cal | Protein: {item.protein}g | Carbs: {item.carbo}g
                           </p>
                           <p className="text-lg font-semibold mt-2">
                             {formatRupiah(item.price)}
@@ -529,12 +529,12 @@ export default function FoodReservation() {
                   <div key={menu.menu_id} className="border p-4 hover:shadow-lg transition">
                     <div className="w-full h-32 bg-gray-100 flex items-center justify-center mb-3 overflow-hidden">
                       {menu.image_url ? (
-                        <img src={menu.image_url} alt={menu.name} className="w-full h-full object-cover" />
+                        <img src={menu.image_url} alt={menu.menu_name} className="w-full h-full object-cover" />
                       ) : (
                         <span className="text-6xl">🍽️</span>
                       )}
                     </div>
-                    <h3 className="font-semibold text-lg mb-2">{menu.name}</h3>
+                    <h3 className="font-semibold text-lg mb-2">{menu.menu_name}</h3>
                     {menu.description && (
                       <p className="text-sm text-gray-600 mb-2 line-clamp-2">{menu.description}</p>
                     )}
@@ -546,7 +546,7 @@ export default function FoodReservation() {
                       ))}
                     </div>
                     <p className="text-sm text-gray-600 mb-3">
-                      {menu.calories} Cal | Protein: {menu.protein}g | Carbs: {menu.carbs}g
+                      {menu.calories} Cal | Protein: {menu.protein}g | Carbs: {menu.carbo}g
                     </p>
                     <div className="flex items-center justify-between">
                       <span className="text-lg font-bold">{formatRupiah(menu.price)}</span>

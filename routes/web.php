@@ -66,5 +66,9 @@ Route::middleware(['auth', 'verified', 'role:Admin,SuperAdmin'])
 Route::post('/midtrans/callback', [FoodReservationController::class, 'midtransCallback'])
     ->name('midtrans.callback');
 
+    Route::get('/menu-gallery', function () {
+    return Inertia::render('MenuGalleryManager');
+});
+
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';

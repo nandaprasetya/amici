@@ -13,3 +13,6 @@ Artisan::command('inspire', function () {
 Schedule::call(function () {
     app(\App\Http\Controllers\TableReservationController::class)->sendReminders();
 })->everyMinute();
+
+Schedule::command('reservation:send-reminder')
+    ->everyMinute();

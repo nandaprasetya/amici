@@ -61,3 +61,6 @@ Route::post('/food-reservation', [FoodReservationController::class, 'store']);
 Route::get('/food-reservation/{reservationId}', [FoodReservationController::class, 'getByReservation']);
 Route::put('/food-reservation/{foodReservationId}', [FoodReservationController::class, 'update']);
 Route::delete('/food-reservation/{foodReservationId}', [FoodReservationController::class, 'delete']);
+
+Route::apiResource('menu-galleries', MenuGalleryController::class);
+Route::apiResource('menus', MenuController::class);
