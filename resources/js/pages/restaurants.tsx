@@ -20,7 +20,7 @@ interface PageProps {
 
 const breadcrumbs = [
     { title: 'Dashboard', href: '/dashboard' },
-    { title: 'Daftar Restoran', href: '#' },
+    { title: 'Daftar Restoran', href: '/restaurants' },
 ];
 
 export default function RestaurantList({ restaurants, filters }: PageProps) {
@@ -93,7 +93,7 @@ export default function RestaurantList({ restaurants, filters }: PageProps) {
                                         </div>
 
                                         <Link
-                                            href={`/reservation/create?restaurant_id=${resto.restaurant_id}`}
+                                            href={`/reservation?restaurant_id=${resto.restaurant_id}`}
                                             className="w-full flex items-center justify-center gap-2 bg-gray-900 hover:bg-orange-600 text-white font-medium py-3 rounded-xl transition-colors duration-300"
                                         >
                                             <Utensils className="w-4 h-4" />

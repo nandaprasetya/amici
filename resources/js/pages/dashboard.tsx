@@ -248,7 +248,7 @@ function StatCard({ title, value, icon, bgColor, isMoney = false, link }: any) {
                 <div className={`p-4 rounded-xl ${bgColor} shrink-0 group-hover:scale-110 transition-transform`}>
                     {icon}
                 </div>
-                <div className="ml-4">
+                <div className="ml-2">
                     <p className="text-sm font-medium text-gray-500">{title}</p>
                     <p className={`text-2xl font-bold text-gray-900 mt-1 ${isMoney ? 'tracking-tight' : ''}`}>
                         {value !== undefined ? value : '-'}

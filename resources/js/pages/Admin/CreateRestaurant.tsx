@@ -10,7 +10,7 @@ const breadcrumbs = [
     },
     {
         title: 'Manajemen Restoran',
-        href: '/admin/restaurants', 
+        href: '/admin/restaurants',
     },
     {
         title: 'Tambah Restoran',

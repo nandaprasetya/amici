@@ -1,62 +1,61 @@
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
-import L, { CRS } from "leaflet";
-import "leaflet/dist/leaflet.css";
+import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
+import MapMarker from "./map-marker";
+import type { Restaurant } from "@/types/restaurant";
 
-const TILE_SIZE = 1200;
-const GRID_SIZE = 3;
-const MAP_SIZE = TILE_SIZE * GRID_SIZE; // 2048
+type MapProps = {
+    restaurants: Restaurant[];
+};
 
-const bounds: [[number, number], [number, number]] = [
-    [0, 0],
-    [MAP_SIZE, MAP_SIZE],
-];
-
-const iconFood = new L.Icon({
-    iconUrl: "/icons/food.png",
-    iconSize: [32, 32],
-    iconAnchor: [16, 32],
-});
-
-const iconCamera = new L.Icon({
-    iconUrl: "/icons/camera.png",
-    iconSize: [32, 32],
-    iconAnchor: [16, 32],
-});
-
-export default function Map() {
+export default function Map({ restaurants }: MapProps) {
     return (
-        <section className="bg-[#f9f6f1] py-12 flex flex-col items-center">
-            <h1 className="text-3xl md:text-5xl font-semibold text-center mb-6">
-                Amici Culinary City
-            </h1>
+        <section className="py-32 bg-[#f9f6f1] mx-10">
+            <div className="max-w-[1400px] mx-auto">
 
-            <div className="w-[90%] md:w-[80%] h-[600px] rounded-2xl overflow-hidden shadow-lg">
-                <MapContainer
-                    crs={CRS.Simple}
-                    bounds={bounds}
-                    maxBounds={bounds}
-                    maxBoundsViscosity={1.0}
-                    zoom={-1}
-                    minZoom={-1}
-                    maxZoom={0}
-                    scrollWheelZoom={false}
-                    className="h-full w-full"
+                {/* MAP VIEWPORT */}
+                <div className="relative w-full h-[80vh] overflow-hidden rounded-3xl bg-white">
+
+                    {/* ZOOM CONTROLS (FIXED, TIDAK IKUT DRAG) */}
+                    <div className="absolute top-6 right-6 z-50 flex flex-col gap-2">
+                        <button className="map-btn" id="zoom-in">+</button>
+                        <button className="map-btn" id="zoom-out">−</button>
+                    </div>
+
+                    <TransformWrapper
+                        minScale={0.8}
+                        maxScale={3}
+                        initialScale={1}
+                        centerOnInit
+                        limitToBounds={false}
+                        panning={{ velocityDisabled: true }}
+                        wheel={{ step: 0.08 }}
+                        pinch={{ step: 5 }}
                     >
-                    <TileLayer
-                        url="/asset/map/0/{x}/{y}.png"
-                        tileSize={1200}
-                        bounds={bounds}
-                        noWrap={true}
-                    />
+                        {({ zoomIn, zoomOut }) => (
+                            <>
+                                {/* ZOOM CONTROLS */}
+                                <div className="absolute top-6 right-6 z-50 flex flex-col gap-2">
+                                    <button onClick={() => zoomIn()} className="map-btn">+</button>
+                                    <button onClick={() => zoomOut()} className="map-btn">−</button>
+                                </div>
 
-                    <Marker position={[900, 1100]} icon={iconFood}>
-                        <Popup>Amici Restaurant</Popup>
-                    </Marker>
+                                <TransformComponent>
+                                    <div className="relative w-[2600px] aspect-[16/9]">
+                                        <img
+                                            src="/asset/map-foodcourt.png"
+                                            className="w-full h-full object-contain select-none"
+                                            draggable={false}
+                                        />
 
-                    <Marker position={[600, 1500]} icon={iconCamera}>
-                        <Popup>Photo Spot Garden</Popup>
-                    </Marker>
-                </MapContainer>
+                                        {restaurants.map((r) => (
+                                            <MapMarker key={r.restaurant_id} restaurant={r} />
+                                        ))}
+                                    </div>
+                                </TransformComponent>
+                            </>
+                        )}
+                    </TransformWrapper>
+
+                </div>
             </div>
         </section>
     );

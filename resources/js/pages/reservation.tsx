@@ -24,7 +24,7 @@ interface Table {
 
 interface Restaurant {
     restaurant_id: string;
-    name: string;
+    restaurant_name: string;
     description?: string;
     image_url?: string;
 }
@@ -128,7 +128,7 @@ export default function Reservation({ restaurant: initialRestaurant, tables: ini
 
         const selectedTable = tables.find(t => t.table_id === tempTableId);
         if (selectedTable) {
-            setSelectedTables([...selectedTables, { 
+            setSelectedTables([...selectedTables, {
                 table_id: selectedTable.table_id,
                 table_name: selectedTable.table_name,
                 table_number: selectedTable.table_number,
@@ -173,7 +173,7 @@ export default function Reservation({ restaurant: initialRestaurant, tables: ini
             alert("Please enter your name");
             return;
         }
-        
+
         setFoodReservationOpen(true);
     };
 
@@ -197,61 +197,61 @@ export default function Reservation({ restaurant: initialRestaurant, tables: ini
     };
 
     const handleSubmitReservation = (reserveFood: boolean) => {
-    setSubmitting(true);
+        setSubmitting(true);
 
-    const formattedTime = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")} ${period}`;
+        const formattedTime = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")} ${period}`;
 
-    const formData = {
-        restaurant_id: restaurant?.restaurant_id || '',
-        name: name,
-        date: selected ? formatDateForBackend(selected) : "",
-        time: formattedTime,
-        guests: guests,
-        tables: selectedTables.map(table => ({
-            table_id: table.table_id,
-            count: table.count
-        })),
-        reserve_food: reserveFood
+        const formData = {
+            restaurant_id: restaurant?.restaurant_id || '',
+            name: name,
+            date: selected ? formatDateForBackend(selected) : "",
+            time: formattedTime,
+            guests: guests,
+            tables: selectedTables.map(table => ({
+                table_id: table.table_id,
+                count: table.count
+            })),
+            reserve_food: reserveFood
+        };
+
+        // Gunakan Inertia router untuk POST ke web route
+        router.post('/reservation', formData as any, {
+            preserveScroll: true,
+            onSuccess: (page) => {
+                // Cek jika ada redirect_url di response
+                const props = page.props as any;
+
+                if (props.redirect_url) {
+                    router.visit(props.redirect_url);
+                } else {
+                    // Reset form jika berhasil tanpa redirect
+                    alert("Reservation confirmed successfully!");
+                    setName("");
+                    setSelected(tomorrow);
+                    setGuests(2);
+                    setSelectedTables([]);
+                    setPolicyChecked(false);
+                }
+                setFoodReservationOpen(false);
+                setSubmitting(false);
+            },
+            onError: (errors) => {
+                // Handle validation errors
+                let message = "Failed to create reservation";
+
+                if (errors && Object.keys(errors).length > 0) {
+                    const errorMessages = Object.values(errors).flat().join('\n');
+                    message += ":\n\n" + errorMessages;
+                }
+
+                alert(message);
+                setSubmitting(false);
+            },
+            onFinish: () => {
+                setSubmitting(false);
+            }
+        });
     };
-
-    // Gunakan Inertia router untuk POST ke web route
-    router.post('/reservation', formData as any, {
-        preserveScroll: true,
-        onSuccess: (page) => {
-            // Cek jika ada redirect_url di response
-            const props = page.props as any;
-            
-            if (props.redirect_url) {
-                router.visit(props.redirect_url);
-            } else {
-                // Reset form jika berhasil tanpa redirect
-                alert("Reservation confirmed successfully!");
-                setName("");
-                setSelected(tomorrow);
-                setGuests(2);
-                setSelectedTables([]);
-                setPolicyChecked(false);
-            }
-            setFoodReservationOpen(false);
-            setSubmitting(false);
-        },
-        onError: (errors) => {
-            // Handle validation errors
-            let message = "Failed to create reservation";
-            
-            if (errors && Object.keys(errors).length > 0) {
-                const errorMessages = Object.values(errors).flat().join('\n');
-                message += ":\n\n" + errorMessages;
-            }
-            
-            alert(message);
-            setSubmitting(false);
-        },
-        onFinish: () => {
-            setSubmitting(false);
-        }
-    });
-};
 
 
 
@@ -276,10 +276,10 @@ export default function Reservation({ restaurant: initialRestaurant, tables: ini
             <div className="w-full lg:w-[50%] min-h-[300px] lg:min-h-screen flex relative">
                 <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-black/20 z-10"></div>
                 <div className="relative w-full h-full">
-                    <img 
-                        src={restaurant.image_url || "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200&q=80"} 
-                        alt={restaurant.name} 
-                        className="w-full h-full object-cover absolute" 
+                    <img
+                        src={restaurant.image_url || "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200&q=80"}
+                        alt={restaurant.restaurant_name}
+                        className="w-full h-full object-cover absolute"
                     />
                 </div>
                 <div className="absolute bottom-8 left-8 z-20 text-white">
@@ -287,7 +287,7 @@ export default function Reservation({ restaurant: initialRestaurant, tables: ini
                         <div className="w-2 h-2 bg-white"></div>
                         <p className="text-sm tracking-widest">RESTAURANT</p>
                     </div>
-                    <h2 className="text-4xl font-bold mb-2">{restaurant.name}</h2>
+                    <h2 className="text-4xl font-bold mb-2">{restaurant.restaurant_name}</h2>
                     <p className="text-sm max-w-md">
                         {restaurant.description || "Here, you can explore flavors, relax with friends, or simply enjoy an atmosphere filled with energy and happiness."}
                     </p>
@@ -299,7 +299,7 @@ export default function Reservation({ restaurant: initialRestaurant, tables: ini
                 <div className="flex w-full h-fit items-center mb-6">
                     <h1 className="font-bold text-2xl">Reserve</h1>
                     <div className="w-[2px] h-6 bg-black mx-4"></div>
-                    <h1 className="font-medium text-xl">{restaurant.name}</h1>
+                    <h1 className="font-medium text-xl">{restaurant.restaurant_name}</h1>
                 </div>
                 <div className="w-full h-[1px] bg-black mb-8"></div>
 
@@ -412,13 +412,13 @@ export default function Reservation({ restaurant: initialRestaurant, tables: ini
                         onClick={() => setTableTypeOpen(true)}
                         disabled={tables.length === 0}
                     >
-                        {tables.length === 0 
+                        {tables.length === 0
                             ? "No tables available"
-                            : selectedTables.length > 0 
-                                ? `${selectedTables.length} table type(s) selected` 
+                            : selectedTables.length > 0
+                                ? `${selectedTables.length} table type(s) selected`
                                 : "Select table types"}
                     </button>
-                    
+
                     {/* Display Selected Tables */}
                     {selectedTables.length > 0 && (
                         <div className="mt-2 flex flex-col gap-2">
@@ -455,7 +455,7 @@ export default function Reservation({ restaurant: initialRestaurant, tables: ini
                     <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded">
                         <p className="text-sm font-semibold text-yellow-800 mb-1">⚠️ Minimum Spend Required</p>
                         <p className="text-xs text-yellow-700">
-                            Your selected tables require a minimum spend of {formatRupiah(getTotalMinimumSpend())}. 
+                            Your selected tables require a minimum spend of {formatRupiah(getTotalMinimumSpend())}.
                             You must reserve food to proceed.
                         </p>
                     </div>
@@ -467,7 +467,7 @@ export default function Reservation({ restaurant: initialRestaurant, tables: ini
                         type="checkbox"
                         id="policy"
                         checked={policyChecked}
-                        onChange={() => {}}
+                        onChange={() => { }}
                         onClick={handlePolicyClick}
                         className="mt-1 w-4 h-4 cursor-pointer"
                     />
@@ -478,11 +478,10 @@ export default function Reservation({ restaurant: initialRestaurant, tables: ini
 
                 {/* Confirm Button */}
                 <button
-                    className={`w-full py-4 text-white font-semibold tracking-wide transition-colors ${
-                        policyChecked && selectedTables.length > 0 && name.trim()
+                    className={`w-full py-4 text-white font-semibold tracking-wide transition-colors ${policyChecked && selectedTables.length > 0 && name.trim()
                             ? "bg-black hover:bg-gray-800"
                             : "bg-gray-400 cursor-not-allowed"
-                    }`}
+                        }`}
                     onClick={handleConfirmReservation}
                     disabled={!policyChecked || selectedTables.length === 0 || !name.trim()}
                 >
@@ -554,7 +553,7 @@ export default function Reservation({ restaurant: initialRestaurant, tables: ini
                                         </option>
                                     ))}
                                 </select>
-                                
+
                                 {tempTableId && (
                                     <div className="mt-2 p-3 bg-white">
                                         <p className="text-sm text-gray-600 mb-2">
@@ -599,11 +598,10 @@ export default function Reservation({ restaurant: initialRestaurant, tables: ini
                         </div>
 
                         <button
-                            className={`w-full py-4 font-semibold tracking-wide transition-colors ${
-                                selectedTables.length > 0
+                            className={`w-full py-4 font-semibold tracking-wide transition-colors ${selectedTables.length > 0
                                     ? "bg-black text-white hover:bg-gray-800"
                                     : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                            }`}
+                                }`}
                             onClick={handleConfirmSelection}
                             disabled={selectedTables.length === 0}
                         >
@@ -629,29 +627,29 @@ export default function Reservation({ restaurant: initialRestaurant, tables: ini
                             </div>
                             <p className="text-sm text-gray-600">Please read and accept our terms and conditions</p>
                         </div>
-                        
+
                         <div className="p-8 overflow-y-auto flex-1">
                             <div className="space-y-4 text-sm leading-relaxed">
                                 <div>
                                     <h3 className="font-bold text-base mb-2">1. Reservation Policy</h3>
                                     <p className="text-gray-700">All reservations must be made at least 24 hours in advance. We reserve the right to cancel or modify reservations due to unforeseen circumstances.</p>
                                 </div>
-                                
+
                                 <div>
                                     <h3 className="font-bold text-base mb-2">2. Cancellation Policy</h3>
                                     <p className="text-gray-700">Cancellations must be made at least 12 hours before the reservation time. Late cancellations may incur a fee.</p>
                                 </div>
-                                
+
                                 <div>
                                     <h3 className="font-bold text-base mb-2">3. Table Reservation</h3>
                                     <p className="text-gray-700">Tables will be held for 15 minutes past the reservation time. After that, the reservation may be cancelled and the table released.</p>
                                 </div>
-                                
+
                                 <div>
                                     <h3 className="font-bold text-base mb-2">4. Payment Terms</h3>
                                     <p className="text-gray-700">Payment is due at the time of service. We accept cash, credit cards, and digital payments.</p>
                                 </div>
-                                
+
                                 <div>
                                     <h3 className="font-bold text-base mb-2">5. Special Requests</h3>
                                     <p className="text-gray-700">While we will do our best to accommodate special requests, we cannot guarantee their fulfillment.</p>
@@ -663,7 +661,7 @@ export default function Reservation({ restaurant: initialRestaurant, tables: ini
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div className="p-8 border-t bg-gray-50">
                             <div className="flex gap-4">
                                 <button
@@ -692,11 +690,11 @@ export default function Reservation({ restaurant: initialRestaurant, tables: ini
                             {hasMinimumSpend() ? "Minimum Spend Required" : "Reserve Food?"}
                         </h2>
                         <p className="text-center text-gray-600 mb-8">
-                            {hasMinimumSpend() 
+                            {hasMinimumSpend()
                                 ? `Your selected tables require a minimum spend of ${getTotalMinimumSpend().toFixed(2)}. You must order food to meet this requirement.`
                                 : "Would you like to reserve food for your table reservation?"}
                         </p>
-                        
+
                         <div className="flex flex-col gap-3">
                             {hasMinimumSpend() ? (
                                 // Jika ada minimum spend, hanya tampilkan tombol reserve food

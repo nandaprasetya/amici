@@ -7,18 +7,18 @@ use App\Http\Controllers\AppController;
 use App\Http\Controllers\TableReservationController;
 use App\Http\Controllers\FoodReservationController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\HomeController;
 
-Route::get('/', function () {
-    return Inertia::render('welcome');
-})->name('home');
 
 // Public routes
 Route::get('/restaurants', [AppController::class, 'index'])->name('restaurants.index.user');
 Route::get('/reservation', [TableReservationController::class, 'reservationPage'])->name('reservation.page');
+Route::get('/', [HomeController::class, 'index'])->name('welcome');
 
 // Authenticated user routes
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
     
     Route::get('/my-reservations', [TableReservationController::class, 'userIndex'])
         ->name('user.reservations.index'); 

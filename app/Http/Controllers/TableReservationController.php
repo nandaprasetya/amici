@@ -22,13 +22,26 @@ class TableReservationController extends Controller
 {
     public function index()
     {
-        $reservations = TableReservation::with('user')
+    $reservations = TableReservation::with([
+        'restaurant:restaurant_id,restaurant_name',
+        'user:user_id,name,email'
+    ])
+    ->orderBy('reservation_time', 'desc')
+    ->get();
+
+    return Inertia::render('Admin/ReservationManagement', [
+        'reservations' => $reservations
+    ]);
+}
+
+public function userIndex(Request $request)
+    {
+        $userId = $request->user()->user_id;
+        $reservations = TableReservation::where('user_id', $userId)
             ->orderBy('reservation_time', 'desc')
             ->get();
-
-        return response()->json([
-            'success' => true,
-            'data' => $reservations
+        return Inertia::render('Customer/ReservationInfo', [
+            'reservations' => $reservations
         ]);
     }
 

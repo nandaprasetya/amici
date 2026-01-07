@@ -6,6 +6,8 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\Restaurant;
 use App\Models\TableReservation;
+use App\Models\Payment;
+use App\Models\FoodReservation;
 use Carbon\Carbon;
 
 class DashboardController extends Controller
@@ -17,21 +19,24 @@ class DashboardController extends Controller
         if (!$user->relationLoaded('role')) {
             $user->load('role');
         }
-        
+
         $roleName = $user->role->role_name ?? 'User';
-        
+
         $data = [];
 
         if ($roleName === 'Admin' || $roleName === 'SuperAdmin') {
-            $data = [
-                'total_restaurants' => Restaurant::count(),
-                'total_reservations' => TableReservation::count(),
-                'total_revenue' => TableReservation::where('status', 'confirmed')->sum('bill'),
-                'pending_count' => TableReservation::where('status', 'pending')->count(),
-                // Data grafik sederhana: Reservasi 7 hari terakhir
-                'chart_data' => $this->getReservationChartData(),
-            ];
-        } 
+
+    $totalRevenue = Payment::where('payment_status', 'pending')->sum('amount');
+
+    $data = [
+        'total_restaurants' => Restaurant::count(),
+        'total_reservations' => TableReservation::count(),
+        'total_revenue' => $totalRevenue,
+        'pending_count' => TableReservation::where('status', 'pending')->count(),
+        'chart_data' => $this->getReservationChartData(),
+    ];
+}
+
 
         else {
             $userId = $user->user_id;
@@ -40,7 +45,7 @@ class DashboardController extends Controller
                 ->where('reservation_time', '>=', Carbon::now())
                 ->where('status', '!=', 'cancelled')
                 ->orderBy('reservation_time', 'asc')
-                ->limit(3) 
+                ->limit(3)
                 ->get();
 
             $data = [

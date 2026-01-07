@@ -20,7 +20,7 @@ interface Reservation {
     reservation_time: string;
     restaurant: Restaurant | null;
     status: 'pending' | 'confirmed' | 'cancelled';
-    bill: number;
+    minimum_spend: number;
     user: User;
 }
 
@@ -82,10 +82,10 @@ export default function AdminReservationIndex({ auth, reservations }: PageProps)
     const filteredReservations = reservations.filter((res) => {
         const term = searchTerm.toLowerCase();
         return (
-            res.user?.name?.toLowerCase().includes(term) || 
-            res.user?.email?.toLowerCase().includes(term) || 
-            res.restaurant?.restaurant_name?.toLowerCase().includes(term) || 
-            res.reservation_id.toLowerCase().includes(term) 
+            res.user?.name?.toLowerCase().includes(term) ||
+            res.user?.email?.toLowerCase().includes(term) ||
+            res.restaurant?.restaurant_name?.toLowerCase().includes(term) ||
+            res.reservation_id.toLowerCase().includes(term)
         );
     });
 
@@ -174,7 +174,7 @@ export default function AdminReservationIndex({ auth, reservations }: PageProps)
                                                         </div>
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
-                                                        {formatRupiah(res.bill)}
+                                                        {formatRupiah(res.minimum_spend)}
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap">
                                                         {getStatusBadge(res.status)}

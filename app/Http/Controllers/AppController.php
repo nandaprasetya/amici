@@ -21,10 +21,10 @@ public function index(Request $request)
 
         $restaurants = $query->orderBy('restaurant_name', 'asc')->get();
         
-        return Inertia::render('Customer/Restaurants/Index', [
-            'restaurants' => $restaurants,
-            'filters' => $request->only(['search']),
-        ]);
+        return Inertia::render('restaurants', [
+    'restaurants' => $restaurants,
+    'filters' => $request->only(['search']),
+]);
     }
 
 }

@@ -289,33 +289,37 @@ export default function FoodReservation() {
     const snapToken = data.snap_token || data.snapToken;
 
     if (!snapToken) {
-      alert("❌ Snap token not found in API response.");
+      alert("❌ Snap token not found");
       setIsProcessing(false);
       return;
     }
 
-    console.log("💳 Opening Midtrans Snap popup with token:", snapToken);
+    window.snap.pay(snapToken, {
+      onSuccess: function (result) {
+        console.log("✅ Payment success", result);
+        router.visit('/dashboard', {
+          replace: true,
+        });
+      },
 
-    window.snap.pay(data.snapToken, {
-        onSuccess: function(result: any) {
-          alert('Payment success!');
-          console.log(result);
-          setCart([]);
-          setNotes({});
-          router.visit('/');
-        },
-        onPending: function(result: any) {
-          alert('Payment pending');
-          console.log(result);
-        },
-        onError: function(result: any) {
-          alert('Payment failed');
-          console.log(result);
-        },
-        onClose: function() {
-          alert('Payment popup closed');
-        }
-      });
+      onPending: function (result) {
+        console.log("⏳ Pending", result);
+        router.visit('/dashboard', {
+          replace: true,
+        });
+      },
+
+      onError: function (result) {
+        console.error("❌ Error", result);
+        alert("Payment failed");
+        setIsProcessing(false);
+      },
+
+      onClose: function () {
+        alert("Payment cancelled");
+        setIsProcessing(false);
+      }
+    });
 
   } catch (e) {
     console.error('❌ Network error:', e);
@@ -390,7 +394,7 @@ export default function FoodReservation() {
                             ))}
                           </div>
                           <p className="text-sm text-gray-600 mt-1">
-                            {item.calories} Cal | Protein: {item.protein}g | Carbs: {item.carbo}g
+                            {item.calories} Cal | Protein: {item.protein}g | carbo: {item.carbo}g
                           </p>
                           <p className="text-lg font-semibold mt-2">
                             {formatRupiah(item.price)}
@@ -546,7 +550,7 @@ export default function FoodReservation() {
                       ))}
                     </div>
                     <p className="text-sm text-gray-600 mb-3">
-                      {menu.calories} Cal | Protein: {menu.protein}g | Carbs: {menu.carbo}g
+                      {menu.calories} Cal | Protein: {menu.protein}g | carbo: {menu.carbo}g
                     </p>
                     <div className="flex items-center justify-between">
                       <span className="text-lg font-bold">{formatRupiah(menu.price)}</span>
