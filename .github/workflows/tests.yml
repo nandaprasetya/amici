@@ -22,6 +22,8 @@ jobs:
           port: 2121
           script: |
             cd /var/www/amici/amici
+            git reset --hard
+            git clean -fd
             git pull origin main
 
             composer install --no-dev --optimize-autoloader
